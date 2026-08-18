@@ -12,10 +12,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(CommonLibSSE CONFIG REQUIRED)
 
-add_library(${PROJECT_NAME} SHARED
-    src/main.cpp
-    src/AnimationProbe.cpp
-    src/ProxyResolver.cpp
+add_commonlibsse_plugin(${PROJECT_NAME}
+    NAME "AnimSync Together"
+    AUTHOR "Caelvanost"
+    VERSION ${PROJECT_VERSION}
+    SOURCES
+        src/main.cpp
+        src/AnimationProbe.cpp
+        src/ProxyResolver.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -27,11 +31,6 @@ target_compile_definitions(${PROJECT_NAME}
     PRIVATE
         WIN32_LEAN_AND_MEAN
         NOMINMAX
-)
-
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE
-        CommonLibSSE::CommonLibSSE
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
