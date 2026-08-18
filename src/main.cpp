@@ -22,15 +22,30 @@ namespace
         spdlog::set_default_logger(std::move(log));
     }
 
+    void InstallProbe(const char* reason)
+    {
+        logger::info("{}; attempting animation probe installation", reason);
+        AnimSyncTogether::AnimationProbe::GetSingleton()->Install();
+    }
+
     void OnSKSEMessage(SKSE::MessagingInterface::Message* message)
     {
         if (!message) {
             return;
         }
 
-        if (message->type == SKSE::MessagingInterface::kDataLoaded) {
-            logger::info("Data loaded; installing animation probe");
-            AnimSyncTogether::AnimationProbe::GetSingleton()->Install();
+        switch (message->type) {
+        case SKSE::MessagingInterface::kDataLoaded:
+            InstallProbe("Data loaded");
+            break;
+        case SKSE::MessagingInterface::kPostLoadGame:
+            InstallProbe("Save loaded");
+            break;
+        case SKSE::MessagingInterface::kNewGame:
+            InstallProbe("New game started");
+            break;
+        default:
+            break;
         }
     }
 }
