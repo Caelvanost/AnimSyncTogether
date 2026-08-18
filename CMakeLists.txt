@@ -13,9 +13,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(CommonLibSSE CONFIG REQUIRED)
 
 add_commonlibsse_plugin(${PROJECT_NAME}
-    NAME "AnimSync Together"
-    AUTHOR "Caelvanost"
-    VERSION ${PROJECT_VERSION}
     SOURCES
         src/main.cpp
         src/AnimationProbe.cpp
