@@ -16,7 +16,6 @@ add_commonlibsse_plugin(${PROJECT_NAME}
     SOURCES
         src/main.cpp
         src/AnimationProbe.cpp
-        src/ProxyResolver.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
