@@ -20,7 +20,7 @@ namespace AnimSyncTogether
         RE::BSAnimationGraphManagerPtr graphManager;
         const bool hasGraphManager = player->GetAnimationGraphManager(graphManager) && graphManager;
         if (!hasGraphManager) {
-            SKSE::log::warning("AnimationProbe: player animation graph manager is not ready");
+            SKSE::log::warn("AnimationProbe: player animation graph manager is not ready");
             return;
         }
 
