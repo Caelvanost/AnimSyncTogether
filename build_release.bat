@@ -13,13 +13,38 @@ echo ============================================================
 echo  AnimSync Together v%VERSION% - Release Build
 echo ============================================================
 
+if not defined VCPKG_ROOT (
+    if exist "C:\vcpkg\scripts\buildsystems\vcpkg.cmake" set "VCPKG_ROOT=C:\vcpkg"
+)
+if not defined VCPKG_ROOT (
+    if exist "%USERPROFILE%\vcpkg\scripts\buildsystems\vcpkg.cmake" set "VCPKG_ROOT=%USERPROFILE%\vcpkg"
+)
+if not defined VCPKG_ROOT (
+    if exist "%LOCALAPPDATA%\vcpkg\scripts\buildsystems\vcpkg.cmake" set "VCPKG_ROOT=%LOCALAPPDATA%\vcpkg"
+)
+
+if not defined VCPKG_ROOT (
+    echo ERROR: vcpkg was not found.
+    echo Set VCPKG_ROOT to your vcpkg installation directory and retry.
+    goto :fail
+)
+
+set "VCPKG_TOOLCHAIN=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
+if not exist "%VCPKG_TOOLCHAIN%" (
+    echo ERROR: vcpkg toolchain not found at:
+    echo %VCPKG_TOOLCHAIN%
+    goto :fail
+)
+
+echo Using vcpkg: %VCPKG_ROOT%
+
 if not exist "%DIST%" mkdir "%DIST%"
 if exist "%PACKAGE%" rmdir /s /q "%PACKAGE%"
 if exist "%ARCHIVE%" del /q "%ARCHIVE%"
 
 echo.
 echo [1/4] Configuring...
-cmake -S "%ROOT%" -B "%BUILD%" -DCMAKE_BUILD_TYPE=Release
+cmake -S "%ROOT%" -B "%BUILD%" -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="%VCPKG_TOOLCHAIN%"
 if errorlevel 1 goto :fail
 
 echo.
