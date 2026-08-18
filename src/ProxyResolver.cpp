@@ -2,6 +2,11 @@
 
 namespace AnimSyncTogether
 {
+    namespace
+    {
+        constexpr RE::FormID kDynamicFormMask = 0xFF000000;
+    }
+
     ProxyResolver* ProxyResolver::GetSingleton()
     {
         static ProxyResolver singleton;
@@ -23,19 +28,16 @@ namespace AnimSyncTogether
 
         const auto* player = RE::PlayerCharacter::GetSingleton();
         identity.isPlayer = actor == player;
-
-        // v0.1.0 deliberately does not guess STR remote-player identity from
-        // generic Actor flags. A wrong heuristic here would classify normal
-        // NPCs as player proxies and contaminate all later animation tests.
-        identity.isPlayerLike = identity.isPlayer;
+        identity.isPlayerLike = identity.isPlayer || IsCandidateProxy(actor);
         return identity;
     }
 
     bool ProxyResolver::IsCandidateProxy(const RE::Actor* actor) const
     {
-        // Reserved for the STR-specific resolver introduced after we have
-        // two-client diagnostic data and a stable proxy identifier.
-        (void)actor;
-        return false;
+        if (!actor || actor == RE::PlayerCharacter::GetSingleton() || actor->IsPlayerRef()) {
+            return false;
+        }
+
+        return (actor->GetFormID() & kDynamicFormMask) == kDynamicFormMask;
     }
 }
