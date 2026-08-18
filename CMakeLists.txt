@@ -24,11 +24,22 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+target_precompile_headers(${PROJECT_NAME}
+    PRIVATE
+        src/PCH.h
+)
+
 target_compile_definitions(${PROJECT_NAME}
     PRIVATE
+        _UNICODE
+        UNICODE
         WIN32_LEAN_AND_MEAN
         NOMINMAX
 )
+
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /permissive- /W4 /utf-8)
+endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     OUTPUT_NAME "AnimSyncTogether"
