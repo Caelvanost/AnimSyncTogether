@@ -4,20 +4,34 @@ AnimSync Together is an experimental SKSE/CommonLibSSE-NG plugin for Skyrim Spec
 
 ## Status
 
-**v0.1.0 — animation probe scaffold**
+**v0.2.0 — animation capture boundary**
 
-The initial milestone focuses on observing local animation graph events, identifying relevant actors, and building the plumbing needed to map a local Skyrim Together player to the corresponding remote proxy.
+Local animation graph capture is working. AnimSync Together is intentionally limited to animation-related responsibilities: capture, classification, filtering, transport payloads, deduplication, and replay.
+
+Remote-player identity and STR proxy discovery are **not** implemented in AnimSync Together. They are delegated to STRPluginMessagingAPI (STRPM), which will expose the local proxy FormID associated with each connected player.
 
 No gameplay-facing synchronization is enabled yet.
 
-## Initial goals
+## Responsibilities
 
-- Observe animation graph events on the local player.
-- Keep the animation capture layer independent from IEDSync Together and OStim Together.
-- Provide a reusable local-player / remote-proxy abstraction.
-- Add a transport-facing message model without modifying Skyrim Together Reborn's native opcodes.
-- Start with deterministic animation events before attempting furniture or OStim scene synchronization.
-- Remain compatible with OAR/Pandora-based setups.
+AnimSync Together owns:
+
+- observing animation graph events;
+- classifying and filtering useful animation events;
+- building animation synchronization messages;
+- deduplication and loop prevention;
+- replaying approved animation events on an actor supplied by STRPM;
+- later furniture and OStim-related animation synchronization.
+
+STRPluginMessagingAPI owns:
+
+- connected-player identity;
+- mapping STR players to their local proxy actors;
+- exposing the local proxy FormID for each relevant remote player;
+- notifying consumers when that mapping appears, changes, or disappears;
+- transport between connected clients.
+
+AnimSync Together must not independently scan `ProcessLists` or guess proxy actors from dynamic FormIDs.
 
 ## Logging
 
@@ -34,7 +48,7 @@ Requirements:
 - vcpkg
 - CommonLibSSE-NG
 
-Configure with CMake and build the `Release` configuration.
+Run `build_release.bat` to create the Vortex-ready archive in `dist`.
 
 ## License
 
