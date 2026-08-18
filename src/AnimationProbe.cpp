@@ -1,8 +1,6 @@
 #include "AnimSyncTogether/AnimationProbe.h"
 #include "AnimSyncTogether/ProxyResolver.h"
 
-#include <SKSE/SKSE.h>
-
 namespace AnimSyncTogether
 {
     AnimationProbe* AnimationProbe::GetSingleton()
@@ -19,8 +17,23 @@ namespace AnimSyncTogether
             return;
         }
 
-        player->AddAnimationGraphEventSink(this);
-        SKSE::log::info("AnimationProbe installed on local PlayerCharacter");
+        RE::BSAnimationGraphManagerPtr graphManager;
+        const bool hasGraphManager = player->GetAnimationGraphManager(graphManager) && graphManager;
+        if (!hasGraphManager) {
+            SKSE::log::warning("AnimationProbe: player animation graph manager is not ready");
+            return;
+        }
+
+        SKSE::log::info(
+            "AnimationProbe: player graph manager ready with {} graph(s)",
+            graphManager->graphs.size());
+
+        const bool added = player->AddAnimationGraphEventSink(this);
+        if (added) {
+            SKSE::log::info("AnimationProbe: sink added to local PlayerCharacter");
+        } else {
+            SKSE::log::info("AnimationProbe: sink was already present or could not be added");
+        }
     }
 
     RE::BSEventNotifyControl AnimationProbe::ProcessEvent(
