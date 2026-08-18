@@ -2,9 +2,10 @@
 setlocal enabledelayedexpansion
 
 set "VERSION=0.1.0"
-set "ROOT=%~dp0"
-set "BUILD=%ROOT%build"
-set "DIST=%ROOT%dist"
+pushd "%~dp0" >nul
+set "ROOT=%CD%"
+set "BUILD=%ROOT%\build"
+set "DIST=%ROOT%\dist"
 set "PACKAGE=%BUILD%\package"
 set "ARCHIVE=%DIST%\AnimSyncTogether-v%VERSION%.zip"
 
@@ -39,9 +40,11 @@ if errorlevel 1 goto :fail
 echo.
 echo [4/4] Done.
 echo Archive: %ARCHIVE%
+popd >nul
 exit /b 0
 
 :fail
 echo.
 echo BUILD FAILED.
+popd >nul
 exit /b 1
