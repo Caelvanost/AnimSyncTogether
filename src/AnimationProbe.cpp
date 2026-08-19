@@ -1,5 +1,7 @@
 #include "AnimSyncTogether/AnimationProbe.h"
 
+#include "AnimSyncTogether/STRPMClient.h"
+
 namespace AnimSyncTogether
 {
     AnimationProbe* AnimationProbe::GetSingleton()
@@ -34,12 +36,14 @@ namespace AnimSyncTogether
         if (added) {
             attachedActors_.insert(formID);
             const auto* base = actor->GetActorBase();
+            const auto connectionID = STRPMClient::GetSingleton()->FindConnectionID(formID);
             SKSE::log::info(
-                "AnimationProbe: sink attached actor={:08X} base={:08X} name='{}' localPlayer={} graphs={} reason='{}'",
+                "AnimationProbe: sink attached actor={:08X} base={:08X} name='{}' localPlayer={} remoteConnection={} graphs={} reason='{}'",
                 formID,
                 base ? base->GetFormID() : 0,
                 actor->GetName(),
                 actor == RE::PlayerCharacter::GetSingleton(),
+                connectionID.value_or(0),
                 graphManager->graphs.size(),
                 reason);
             return true;
@@ -51,6 +55,45 @@ namespace AnimSyncTogether
             actor->GetName(),
             reason);
         return false;
+    }
+
+    bool AnimationProbe::AttachActorByFormID(RE::FormID formID, const char* reason)
+    {
+        if (formID == 0) {
+            return false;
+        }
+
+        auto* actor = RE::TESForm::LookupByID<RE::Actor>(formID);
+        if (!actor) {
+            SKSE::log::info(
+                "AnimationProbe: actor lookup failed formID={:08X} reason='{}'",
+                formID,
+                reason);
+            return false;
+        }
+
+        return AttachActor(actor, reason);
+    }
+
+    void AnimationProbe::DetachActorByFormID(RE::FormID formID, const char* reason)
+    {
+        if (!attachedActors_.erase(formID)) {
+            return;
+        }
+
+        if (auto* actor = RE::TESForm::LookupByID<RE::Actor>(formID)) {
+            actor->RemoveAnimationGraphEventSink(this);
+            SKSE::log::info(
+                "AnimationProbe: sink detached actor={:08X} name='{}' reason='{}'",
+                formID,
+                actor->GetName(),
+                reason);
+        } else {
+            SKSE::log::info(
+                "AnimationProbe: detached stale actor formID={:08X} reason='{}'",
+                formID,
+                reason);
+        }
     }
 
     void AnimationProbe::Install()
@@ -77,13 +120,16 @@ namespace AnimSyncTogether
             return RE::BSEventNotifyControl::kContinue;
         }
 
+        const auto formID = actor->GetFormID();
         const auto* base = actor->GetActorBase();
+        const auto connectionID = STRPMClient::GetSingleton()->FindConnectionID(formID);
         SKSE::log::info(
-            "AnimEvent actor={:08X} base={:08X} name='{}' localPlayer={} tag='{}' payload='{}'",
-            actor->GetFormID(),
+            "AnimEvent actor={:08X} base={:08X} name='{}' localPlayer={} remoteConnection={} tag='{}' payload='{}'",
+            formID,
             base ? base->GetFormID() : 0,
             actor->GetName(),
             actor == RE::PlayerCharacter::GetSingleton(),
+            connectionID.value_or(0),
             event->tag.c_str(),
             event->payload.c_str());
 
