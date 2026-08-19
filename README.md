@@ -4,18 +4,19 @@ AnimSync Together is an experimental SKSE/CommonLibSSE-NG plugin for Skyrim Spec
 
 ## Status
 
-**v0.4.0 — STRPM animation transport probe**
+**v0.5.0 — first remote helmet replay**
 
-Local animation capture and STRPM ProxyResolver integration are working. v0.4.0 adds the first dedicated AnimSync STRPM channel and forwards only the helmet-related animation-object events that were observed locally on Player1 but missing from the remote proxy on Player2.
+Local animation capture, STRPM transport and STRPM ProxyResolver integration are working. v0.5.0 turns the validated Helmet Toggle 2 transport probe into the first gameplay-facing replay experiment.
 
-Current allow-list:
+The local player's `AnimObjLoad` event with payload `AnimObjectGPMA` is used as a stable marker that the helmet animation sequence has started. AnimSync sends one packet for that marker instead of forwarding every output event emitted by the graph.
 
-- `AnimObjLoad` with payload `AnimObjectGPMA`;
-- `AnimObjDraw` with payload `AnimObjectGPMA`;
-- `AnimObjLoad` with payload `AnimObjectHelmetInvisible`;
-- `AnimObjDraw` with payload `AnimObjectHelmetInvisible`.
+On the receiving client, AnimSync resolves the authenticated STRPM sender to the current local proxy FormID and calls:
 
-Received packets are resolved through STRPM `ConnectionID -> local proxy FormID` and logged as `AnimRx`. **v0.4.0 does not replay them yet.** This is intentional: the payload is significant and must be preserved before choosing the correct replay injection point.
+`NotifyAnimationGraph("AnimObjectUnequip")`
+
+on that proxy on the game thread.
+
+This intentionally replays the **behavior input event**, not the observed `AnimObjLoad` / `AnimObjDraw` output events. The proxy's own behavior/OAR setup is expected to produce the appropriate animation-object outputs locally.
 
 Animations already reproduced natively by STR, such as sneak, jump and furniture transitions, are not retransmitted by AnimSync.
 
@@ -27,7 +28,9 @@ AnimSync Together does not scan `ProcessLists`, infer proxies from dynamic FormI
 
 ## Runtime dependency
 
-v0.4.0 expects STRPluginMessagingAPI v0.8.2 or newer with ProxyResolver API v1 installed on both clients.
+v0.5.0 expects STRPluginMessagingAPI v0.8.2 or newer with ProxyResolver API v1 installed on both clients.
+
+Helmet Toggle 2 / DAV / OAR remain responsible for the actual helmet animation and visibility behavior.
 
 ## Logging
 
@@ -35,17 +38,19 @@ Logs are written to:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/AnimSyncTogether.log`
 
-Useful v0.4.0 markers:
+Useful v0.5.0 markers:
 
-- `AnimTx` — allow-listed local animation packet sent through STRPM;
-- `AnimRx` — packet received and resolved to the sender's local proxy FormID;
-- `replay=false` — diagnostic transport milestone; no graph mutation yet.
+- `AnimTx tag='AnimObjLoad' payload='AnimObjectGPMA'` — local helmet sequence trigger sent through STRPM;
+- `AnimRx ... replay=true behaviorEvent='AnimObjectUnequip' result=true` — remote proxy accepted the behavior event;
+- `result=false` — the proxy graph rejected or could not consume the behavior event.
+
+If replay succeeds, the remote proxy should subsequently emit its own animation graph events for the helmet sequence. Those proxy events are logged but are never retransmitted, preventing loops.
 
 ## Build
 
 Run `build_release.bat` to create:
 
-`dist/AnimSyncTogether-v0.4.0.zip`
+`dist/AnimSyncTogether-v0.5.0.zip`
 
 ## License
 
