@@ -1,3 +1,4 @@
+#include "AnimSyncTogether/AnimationInputProbe.h"
 #include "AnimSyncTogether/AnimationProbe.h"
 #include "AnimSyncTogether/STRPMClient.h"
 #include "AnimSyncTogether/Version.h"
@@ -26,6 +27,8 @@ namespace
     void InstallRuntime(const char* reason)
     {
         logger::info("{}; initializing AnimSync runtime", reason);
+
+        AnimSyncTogether::AnimationInputProbe::Install();
 
         if (!AnimSyncTogether::STRPMClient::GetSingleton()->IsAvailable()) {
             AnimSyncTogether::STRPMClient::GetSingleton()->Initialize();
