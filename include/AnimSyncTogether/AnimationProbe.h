@@ -12,6 +12,8 @@ namespace AnimSyncTogether
         static AnimationProbe* GetSingleton();
 
         void Install();
+        bool AttachActorByFormID(RE::FormID formID, const char* reason);
+        void DetachActorByFormID(RE::FormID formID, const char* reason);
 
         RE::BSEventNotifyControl ProcessEvent(
             const RE::BSAnimationGraphEvent* event,
