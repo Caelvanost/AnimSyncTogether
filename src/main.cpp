@@ -1,4 +1,5 @@
 #include "AnimSyncTogether/AnimationProbe.h"
+#include "AnimSyncTogether/STRPMClient.h"
 #include "AnimSyncTogether/Version.h"
 
 #include <spdlog/sinks/basic_file_sink.h>
@@ -22,9 +23,14 @@ namespace
         spdlog::set_default_logger(std::move(log));
     }
 
-    void InstallProbe(const char* reason)
+    void InstallRuntime(const char* reason)
     {
-        logger::info("{}; attempting animation probe installation", reason);
+        logger::info("{}; initializing AnimSync runtime", reason);
+
+        if (!AnimSyncTogether::STRPMClient::GetSingleton()->IsAvailable()) {
+            AnimSyncTogether::STRPMClient::GetSingleton()->Initialize();
+        }
+
         AnimSyncTogether::AnimationProbe::GetSingleton()->Install();
     }
 
@@ -36,13 +42,13 @@ namespace
 
         switch (message->type) {
         case SKSE::MessagingInterface::kDataLoaded:
-            InstallProbe("Data loaded");
+            InstallRuntime("Data loaded");
             break;
         case SKSE::MessagingInterface::kPostLoadGame:
-            InstallProbe("Save loaded");
+            InstallRuntime("Save loaded");
             break;
         case SKSE::MessagingInterface::kNewGame:
-            InstallProbe("New game started");
+            InstallRuntime("New game started");
             break;
         default:
             break;
