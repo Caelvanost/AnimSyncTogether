@@ -4,40 +4,47 @@ AnimSync Together is an experimental SKSE/CommonLibSSE-NG plugin for Skyrim Spec
 
 ## Status
 
-**v0.2.0 — animation capture boundary**
+**v0.3.0 — STRPM proxy registry integration**
 
-Local animation graph capture is working. AnimSync Together is intentionally limited to animation-related responsibilities: capture, classification, filtering, transport payloads, deduplication, and replay.
+Local animation graph capture is working. AnimSync Together now consumes the validated STRPluginMessagingAPI (STRPM) ProxyResolver and attaches its animation probe to remote-player proxy actors using the local FormIDs supplied by STRPM.
 
-Remote-player identity and STR proxy discovery are **not** implemented in AnimSync Together. They are delegated to STRPluginMessagingAPI (STRPM), which will expose the local proxy FormID associated with each connected player.
-
-No gameplay-facing synchronization is enabled yet.
+No gameplay-facing animation replay is enabled yet. v0.3.0 is a diagnostic multiplayer milestone used to compare local animation events with the events STR already generates on the corresponding remote proxy.
 
 ## Responsibilities
 
 AnimSync Together owns:
 
 - observing animation graph events;
+- attaching animation sinks to actors explicitly supplied by STRPM;
 - classifying and filtering useful animation events;
 - building animation synchronization messages;
 - deduplication and loop prevention;
-- replaying approved animation events on an actor supplied by STRPM;
+- replaying approved animation events in later milestones;
 - later furniture and OStim-related animation synchronization.
 
 STRPluginMessagingAPI owns:
 
 - connected-player identity;
 - mapping STR players to their local proxy actors;
-- exposing the local proxy FormID for each relevant remote player;
-- notifying consumers when that mapping appears, changes, or disappears;
+- exposing `ConnectionID -> local proxy FormID`;
+- notifying consumers when that mapping appears, changes, disappears, or is cleared;
 - transport between connected clients.
 
-AnimSync Together must not independently scan `ProcessLists` or guess proxy actors from dynamic FormIDs.
+AnimSync Together does not scan `ProcessLists`, infer proxies from `0xFFxxxxxx`, or match actors by name.
+
+## Runtime dependency
+
+v0.3.0 expects STRPluginMessagingAPI v0.8.2 or newer with ProxyResolver API v1 installed on the client.
+
+The consumer API header is vendored in `include/STRPluginMessagingAPI/` so AnimSync can compile independently; at runtime it dynamically loads `STRPluginMessagingAPI.dll`.
 
 ## Logging
 
 After loading the game, logs are written to:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/AnimSyncTogether.log`
+
+Proxy events include the STRPM `remoteConnection` value so local and remote logs can be correlated without relying on actor names.
 
 ## Build
 
@@ -48,7 +55,9 @@ Requirements:
 - vcpkg
 - CommonLibSSE-NG
 
-Run `build_release.bat` to create the Vortex-ready archive in `dist`.
+Run `build_release.bat` to create:
+
+`dist/AnimSyncTogether-v0.3.0.zip`
 
 ## License
 
