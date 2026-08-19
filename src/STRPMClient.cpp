@@ -14,6 +14,9 @@ namespace AnimSyncTogether
     {
         constexpr char kAnimationChannel[] = "caelvanost.animsynctogether.anim.v1";
         constexpr std::uint32_t kAnimationPacketVersion = 1;
+        constexpr std::string_view kHelmetReplayTag = "AnimObjLoad";
+        constexpr std::string_view kHelmetReplayPayload = "AnimObjectGPMA";
+        constexpr char kHelmetBehaviorEvent[] = "AnimObjectUnequip";
 
         struct AnimationPacket
         {
@@ -63,7 +66,7 @@ namespace AnimSyncTogether
                 return false;
             }
             channelRegistered_ = true;
-            SKSE::log::info("STRPMClient: animation channel registered '{}'; transport probe enabled", kAnimationChannel);
+            SKSE::log::info("STRPMClient: animation channel registered '{}'; helmet replay enabled", kAnimationChannel);
         }
 
         if (!resolver_) {
@@ -204,13 +207,40 @@ namespace AnimSyncTogether
         }
 
         auto* actor = RE::TESForm::LookupByID<RE::Actor>(formID);
+        if (!actor) {
+            SKSE::log::info(
+                "AnimRx sender={} proxy={:08X} actor='<missing>' tag='{}' payload='{}' replay=false",
+                senderConnectionID,
+                formID,
+                tag,
+                payload);
+            return;
+        }
+
+        const bool isHelmetTrigger = tag == kHelmetReplayTag && payload == kHelmetReplayPayload;
+        if (!isHelmetTrigger) {
+            SKSE::log::info(
+                "AnimRx sender={} proxy={:08X} actor='{}' tag='{}' payload='{}' replay=false",
+                senderConnectionID,
+                formID,
+                actor->GetName(),
+                tag,
+                payload);
+            return;
+        }
+
+        const RE::BSFixedString behaviorEvent{ kHelmetBehaviorEvent };
+        const bool replayed = actor->NotifyAnimationGraph(behaviorEvent);
+
         SKSE::log::info(
-            "AnimRx sender={} proxy={:08X} actor='{}' tag='{}' payload='{}' replay=false",
+            "AnimRx sender={} proxy={:08X} actor='{}' tag='{}' payload='{}' replay=true behaviorEvent='{}' result={}",
             senderConnectionID,
             formID,
-            actor ? actor->GetName() : "<missing>",
+            actor->GetName(),
             tag,
-            payload);
+            payload,
+            kHelmetBehaviorEvent,
+            replayed);
     }
 
     void STRPM_CALL STRPMClient::OnProxyMappingChanged(
