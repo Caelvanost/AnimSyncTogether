@@ -2,8 +2,10 @@
 
 #include "AnimSyncTogether/AnimationProbe.h"
 
+#include <algorithm>
 #include <array>
 #include <cstring>
+#include <span>
 #include <string>
 
 namespace AnimSyncTogether
@@ -135,10 +137,7 @@ namespace AnimSyncTogether
             return false;
         }
 
-        SKSE::log::info(
-            "AnimTx tag='{}' payload='{}'",
-            tag,
-            payload);
+        SKSE::log::info("AnimTx tag='{}' payload='{}'", tag, payload);
         return true;
     }
 
