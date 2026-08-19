@@ -4,60 +4,48 @@ AnimSync Together is an experimental SKSE/CommonLibSSE-NG plugin for Skyrim Spec
 
 ## Status
 
-**v0.3.0 — STRPM proxy registry integration**
+**v0.4.0 — STRPM animation transport probe**
 
-Local animation graph capture is working. AnimSync Together now consumes the validated STRPluginMessagingAPI (STRPM) ProxyResolver and attaches its animation probe to remote-player proxy actors using the local FormIDs supplied by STRPM.
+Local animation capture and STRPM ProxyResolver integration are working. v0.4.0 adds the first dedicated AnimSync STRPM channel and forwards only the helmet-related animation-object events that were observed locally on Player1 but missing from the remote proxy on Player2.
 
-No gameplay-facing animation replay is enabled yet. v0.3.0 is a diagnostic multiplayer milestone used to compare local animation events with the events STR already generates on the corresponding remote proxy.
+Current allow-list:
+
+- `AnimObjLoad` with payload `AnimObjectGPMA`;
+- `AnimObjDraw` with payload `AnimObjectGPMA`;
+- `AnimObjLoad` with payload `AnimObjectHelmetInvisible`;
+- `AnimObjDraw` with payload `AnimObjectHelmetInvisible`.
+
+Received packets are resolved through STRPM `ConnectionID -> local proxy FormID` and logged as `AnimRx`. **v0.4.0 does not replay them yet.** This is intentional: the payload is significant and must be preserved before choosing the correct replay injection point.
+
+Animations already reproduced natively by STR, such as sneak, jump and furniture transitions, are not retransmitted by AnimSync.
 
 ## Responsibilities
 
-AnimSync Together owns:
+AnimSync Together owns animation capture, filtering, transport payloads, deduplication and replay. STRPluginMessagingAPI owns connected-player identity, proxy resolution and transport.
 
-- observing animation graph events;
-- attaching animation sinks to actors explicitly supplied by STRPM;
-- classifying and filtering useful animation events;
-- building animation synchronization messages;
-- deduplication and loop prevention;
-- replaying approved animation events in later milestones;
-- later furniture and OStim-related animation synchronization.
-
-STRPluginMessagingAPI owns:
-
-- connected-player identity;
-- mapping STR players to their local proxy actors;
-- exposing `ConnectionID -> local proxy FormID`;
-- notifying consumers when that mapping appears, changes, disappears, or is cleared;
-- transport between connected clients.
-
-AnimSync Together does not scan `ProcessLists`, infer proxies from `0xFFxxxxxx`, or match actors by name.
+AnimSync Together does not scan `ProcessLists`, infer proxies from dynamic FormIDs, or match actors by name.
 
 ## Runtime dependency
 
-v0.3.0 expects STRPluginMessagingAPI v0.8.2 or newer with ProxyResolver API v1 installed on the client.
-
-The consumer API header is vendored in `include/STRPluginMessagingAPI/` so AnimSync can compile independently; at runtime it dynamically loads `STRPluginMessagingAPI.dll`.
+v0.4.0 expects STRPluginMessagingAPI v0.8.2 or newer with ProxyResolver API v1 installed on both clients.
 
 ## Logging
 
-After loading the game, logs are written to:
+Logs are written to:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/AnimSyncTogether.log`
 
-Proxy events include the STRPM `remoteConnection` value so local and remote logs can be correlated without relying on actor names.
+Useful v0.4.0 markers:
+
+- `AnimTx` — allow-listed local animation packet sent through STRPM;
+- `AnimRx` — packet received and resolved to the sender's local proxy FormID;
+- `replay=false` — diagnostic transport milestone; no graph mutation yet.
 
 ## Build
 
-Requirements:
-
-- Visual Studio 2022/2026 with C++ desktop development tools
-- CMake
-- vcpkg
-- CommonLibSSE-NG
-
 Run `build_release.bat` to create:
 
-`dist/AnimSyncTogether-v0.3.0.zip`
+`dist/AnimSyncTogether-v0.4.0.zip`
 
 ## License
 
