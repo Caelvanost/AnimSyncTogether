@@ -6,14 +6,9 @@ namespace AnimSyncTogether
 {
     namespace
     {
-        bool IsHelmetTransportCandidate(std::string_view tag, std::string_view payload)
+        bool IsHelmetReplayTrigger(std::string_view tag, std::string_view payload)
         {
-            if (tag != "AnimObjLoad" && tag != "AnimObjDraw") {
-                return false;
-            }
-
-            return payload == "AnimObjectGPMA" ||
-                   payload == "AnimObjectHelmetInvisible";
+            return tag == "AnimObjLoad" && payload == "AnimObjectGPMA";
         }
     }
 
@@ -150,7 +145,11 @@ namespace AnimSyncTogether
             tag,
             payload);
 
-        if (isLocalPlayer && IsHelmetTransportCandidate(tag, payload)) {
+        // AnimObjLoad + AnimObjectGPMA is the first stable output marker of the
+        // Helmet Toggle animation sequence. Send only this marker so the remote
+        // client can start the behavior once instead of replaying every output
+        // event emitted by the graph.
+        if (isLocalPlayer && IsHelmetReplayTrigger(tag, payload)) {
             STRPMClient::GetSingleton()->SendAnimationEvent(tag, payload);
         }
 
