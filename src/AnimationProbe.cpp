@@ -4,6 +4,19 @@
 
 namespace AnimSyncTogether
 {
+    namespace
+    {
+        bool IsHelmetTransportCandidate(std::string_view tag, std::string_view payload)
+        {
+            if (tag != "AnimObjLoad" && tag != "AnimObjDraw") {
+                return false;
+            }
+
+            return payload == "AnimObjectGPMA" ||
+                   payload == "AnimObjectHelmetInvisible";
+        }
+    }
+
     AnimationProbe* AnimationProbe::GetSingleton()
     {
         static AnimationProbe singleton;
@@ -122,16 +135,24 @@ namespace AnimSyncTogether
 
         const auto formID = actor->GetFormID();
         const auto* base = actor->GetActorBase();
+        const auto isLocalPlayer = actor == RE::PlayerCharacter::GetSingleton();
         const auto connectionID = STRPMClient::GetSingleton()->FindConnectionID(formID);
+        const std::string_view tag = event->tag.c_str();
+        const std::string_view payload = event->payload.c_str();
+
         SKSE::log::info(
             "AnimEvent actor={:08X} base={:08X} name='{}' localPlayer={} remoteConnection={} tag='{}' payload='{}'",
             formID,
             base ? base->GetFormID() : 0,
             actor->GetName(),
-            actor == RE::PlayerCharacter::GetSingleton(),
+            isLocalPlayer,
             connectionID.value_or(0),
-            event->tag.c_str(),
-            event->payload.c_str());
+            tag,
+            payload);
+
+        if (isLocalPlayer && IsHelmetTransportCandidate(tag, payload)) {
+            STRPMClient::GetSingleton()->SendAnimationEvent(tag, payload);
+        }
 
         return RE::BSEventNotifyControl::kContinue;
     }
