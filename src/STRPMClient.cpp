@@ -2,6 +2,7 @@
 
 #include "AnimSyncTogether/AnimationClipProbe.h"
 #include "AnimSyncTogether/AnimationProbe.h"
+#include "AnimSyncTogether/OARClient.h"
 
 #include <algorithm>
 #include <array>
@@ -49,6 +50,8 @@ namespace AnimSyncTogether
 
     bool STRPMClient::Initialize()
     {
+        OARClient::GetSingleton()->Initialize();
+
         if (!messaging_) {
             messaging_ = STRPM::LoadFromModule();
             if (!messaging_) {
@@ -234,6 +237,11 @@ namespace AnimSyncTogether
         EnsureHelmetToggleNPCSpell(actor);
 
         if (tag == "OffsetGPMA") {
+            // OAR may have evaluated and cached Helmet Toggle NPC conditions before
+            // AnimSync injected HT_NPCSpellMonitor. Force a fresh condition evaluation
+            // immediately before activating the GPMA clip on the STR proxy.
+            OARClient::GetSingleton()->ClearConditionStateData(actor);
+
             AnimationClipProbe::ArmActor(formID, "remote OffsetGPMA");
 
             std::int32_t offsetType = 0;
@@ -292,6 +300,7 @@ namespace AnimSyncTogether
 
         if (added) {
             injectedHelmetToggleSpellActors_.insert(formID);
+            OARClient::GetSingleton()->ClearConditionStateData(actor);
         }
     }
 
