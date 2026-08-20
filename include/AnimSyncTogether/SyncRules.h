@@ -40,6 +40,7 @@ namespace AnimSyncTogether
         SyncRules() = default;
 
         void LoadRuleFiles();
+        void DiscoverOARGraphVariables();
         void AddBuiltInHelmetFallback();
         void ParseRuleFile(const std::string& path, std::string_view profileName);
         void AddEvent(std::string_view eventName, std::string_view source);
