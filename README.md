@@ -4,33 +4,28 @@ AnimSync Together is an experimental SKSE/CommonLibSSE-NG plugin for Skyrim Spec
 
 ## Status
 
-**v0.5.0 — first remote helmet replay**
+**v0.8.0 — Helmet Toggle NPC/OAR compatibility probe**
 
-Local animation capture, STRPM transport and STRPM ProxyResolver integration are working. v0.5.0 turns the validated Helmet Toggle 2 transport probe into the first gameplay-facing replay experiment.
+The STRPM transport and proxy replay path are validated. In v0.7.0, `OffsetGPMA` reached the remote STR proxy, returned `true`, and produced the expected GPMA graph outputs (`AnimObjectUnequip`, `AnimObjLoad`, `AnimObjDraw`). The animation was still visually absent, which points to OAR selecting the generic GPMA behavior instead of Helmet Toggle 2's NPC animation replacement.
 
-The local player's `AnimObjLoad` event with payload `AnimObjectGPMA` is used as a stable marker that the helmet animation sequence has started. AnimSync sends one packet for that marker instead of forwarding every output event emitted by the graph.
+Helmet Toggle 2 documents that NPC/follower animations are enabled through monitor spells such as `HT_NPCSpellMonitor`. v0.8.0 therefore resolves `HT_NPCSpellMonitor` by EditorID and temporarily adds it to STR proxy actors while their STRPM mapping exists. AnimSync only removes the spell if AnimSync itself added it.
 
-On the receiving client, AnimSync resolves the authenticated STRPM sender to the current local proxy FormID and calls:
+The synchronized behavior inputs remain:
 
-`NotifyAnimationGraph("AnimObjectUnequip")`
+- `OffsetGPMA`
+- `OffsetGPMAStop`
 
-on that proxy on the game thread.
-
-This intentionally replays the **behavior input event**, not the observed `AnimObjLoad` / `AnimObjDraw` output events. The proxy's own behavior/OAR setup is expected to produce the appropriate animation-object outputs locally.
-
-Animations already reproduced natively by STR, such as sneak, jump and furniture transitions, are not retransmitted by AnimSync.
-
-## Responsibilities
-
-AnimSync Together owns animation capture, filtering, transport payloads, deduplication and replay. STRPluginMessagingAPI owns connected-player identity, proxy resolution and transport.
-
-AnimSync Together does not scan `ProcessLists`, infer proxies from dynamic FormIDs, or match actors by name.
+Animations already reproduced natively by STR, such as sneak, jump and furniture transitions, are not retransmitted.
 
 ## Runtime dependency
 
-v0.5.0 expects STRPluginMessagingAPI v0.8.2 or newer with ProxyResolver API v1 installed on both clients.
+- STRPluginMessagingAPI v0.8.2 or newer
+- Helmet Toggle 2
+- Open Animation Replacer
+- Offset Movement Animation
+- Dynamic Armor Variants
 
-Helmet Toggle 2 / DAV / OAR remain responsible for the actual helmet animation and visibility behavior.
+If `HT_NPCSpellMonitor` cannot be found, AnimSync logs a warning and leaves the proxy unchanged.
 
 ## Logging
 
@@ -38,19 +33,19 @@ Logs are written to:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/AnimSyncTogether.log`
 
-Useful v0.5.0 markers:
+Useful v0.8.0 markers:
 
-- `AnimTx tag='AnimObjLoad' payload='AnimObjectGPMA'` — local helmet sequence trigger sent through STRPM;
-- `AnimRx ... replay=true behaviorEvent='AnimObjectUnequip' result=true` — remote proxy accepted the behavior event;
-- `result=false` — the proxy graph rejected or could not consume the behavior event.
-
-If replay succeeds, the remote proxy should subsequently emit its own animation graph events for the helmet sequence. Those proxy events are logged but are never retransmitted, preventing loops.
+- `AnimTxInput event='OffsetGPMA'`
+- `AnimRxInput ... event='OffsetGPMA' replay=true result=true`
+- `HelmetToggleCompat: add spell ... result=true`
+- `HelmetToggleCompat: spell 'HT_NPCSpellMonitor' not found`
+- `HelmetToggleCompat: remove spell ...`
 
 ## Build
 
 Run `build_release.bat` to create:
 
-`dist/AnimSyncTogether-v0.5.0.zip`
+`dist/AnimSyncTogether-v0.8.0.zip`
 
 ## License
 
