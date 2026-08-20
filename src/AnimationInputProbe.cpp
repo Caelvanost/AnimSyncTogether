@@ -5,6 +5,8 @@
 #include "AnimSyncTogether/STRPMClient.h"
 #include "AnimSyncTogether/SyncRules.h"
 
+#include <string>
+
 namespace AnimSyncTogether
 {
     namespace
@@ -34,6 +36,7 @@ namespace AnimSyncTogether
     {
         const std::string_view name = eventName.c_str();
         auto* rules = SyncRules::GetSingleton();
+        const bool tracked = rules->ShouldSyncEvent(name);
 
         // Capture all explicitly profiled graph variables before every local graph
         // input. Changed values are sent on the same reliable ordered STRPM channel
@@ -63,12 +66,12 @@ namespace AnimSyncTogether
                 offsetType);
         }
 
-        if (name == "OffsetGPMA") {
-            AnimationClipProbe::ArmActor(0x14, "local OffsetGPMA");
+        if (tracked) {
+            const std::string reason = "local profiled event " + std::string(name);
+            AnimationClipProbe::ArmActor(0x14, reason);
         }
 
         const auto result = originalPlayerNotify_(holder, eventName);
-        const bool tracked = rules->ShouldSyncEvent(name);
 
         SKSE::log::info(
             "AnimInput actor=00000014 localPlayer=true event='{}' result={} tracked={}",
