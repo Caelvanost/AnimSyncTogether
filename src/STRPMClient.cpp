@@ -1,5 +1,6 @@
 #include "AnimSyncTogether/STRPMClient.h"
 
+#include "AnimSyncTogether/AnimationClipProbe.h"
 #include "AnimSyncTogether/AnimationProbe.h"
 
 #include <algorithm>
@@ -231,6 +232,19 @@ namespace AnimSyncTogether
         }
 
         EnsureHelmetToggleNPCSpell(actor);
+
+        if (tag == "OffsetGPMA") {
+            AnimationClipProbe::ArmActor(formID, "remote OffsetGPMA");
+
+            std::int32_t offsetType = 0;
+            const RE::BSFixedString offsetTypeVariable{ "iGPMAOffsetType" };
+            const bool hasOffsetType = actor->GetGraphVariableInt(offsetTypeVariable, offsetType);
+            SKSE::log::info(
+                "GPMAState actor={:08X} localPlayer=false variable='iGPMAOffsetType' present={} value={}",
+                formID,
+                hasOffsetType,
+                offsetType);
+        }
 
         const RE::BSFixedString inputEvent{ tag };
         const bool replayed = actor->NotifyAnimationGraph(inputEvent);
