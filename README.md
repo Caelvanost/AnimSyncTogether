@@ -4,81 +4,184 @@ AnimSync Together is an experimental SKSE/CommonLibSSE-NG plugin for Skyrim Spec
 
 ## Status
 
-**v0.11.4 — Helmet Toggle stale hand-marker cleanup**
+**v0.12.0 — data-driven custom animation synchronization foundation**
 
-Inspection of Helmet Toggle 2 v3.6.1 showed that its OAR replacements are selected primarily from graph state rather than a PlayerCharacter-only condition. In particular, Helmet Toggle writes `iGPMAAnimationType` before sending `OffsetGPMA`, and its equip/unequip families use that state to select the matching OAR replacement.
+v0.11.x validated the core approach with Helmet Toggle 2: custom animation replacement is often controlled by animation graph state that Skyrim Together Reborn does not reproduce on its remote proxies. Synchronizing the required graph variables before replaying a custom graph input allows Open Animation Replacer to select the same replacement on the remote client.
 
-AnimSync v0.11.x synchronizes the graph state required by Helmet Toggle:
+The Helmet Toggle path remains validated and retained in v0.12.0, including the stale `AnimObjectHelmetInvisible` scene-graph cleanup introduced in v0.11.4.
 
-- `iGPMAAnimationType`
-- `iGPMAOffsetType`
-- `OffsetGPMA`
-- `OffsetGPMAStop`
+v0.12.0 generalizes the transport so compatibility with additional animation mods no longer has to be hardcoded into the DLL.
 
-On the sending PlayerCharacter, AnimSync captures both graph variables immediately before the graph input is processed. On the receiving STR proxy, AnimSync applies the transmitted variables before replaying `OffsetGPMA`, clears OAR condition state so the replacement is evaluated against the new graph state, then replays the input.
+### Generic synchronization model
 
-v0.11.0 validated this approach in two-client testing: the remote STR proxy selected the same Helmet Toggle OAR replacement and the same effective animation duration as the local player.
+AnimSync now supports two ordered message kinds on the existing STRPM animation channel:
 
-v0.11.1 removed the temporary `HT_NPCSpellMonitor` injection introduced during earlier diagnostics and added local `iGPMAAnimationType` reset handling when a proxy emits its own `OffsetGPMAStop`.
+1. `GraphVariable`
+   - bool
+   - int
+   - float
+2. `AnimationEvent`
 
-v0.11.2 fixed the CommonLib constness issue in that proxy-output reset path by resolving a mutable `RE::Actor*` from the event actor's FormID before changing graph variables.
+Both message kinds use the same reliable + ordered channel. When a local PlayerCharacter graph input occurs, AnimSync first captures all graph variables listed by active rule profiles. Only changed values are transmitted. If the graph input itself is listed as a synchronized event, that event is sent afterwards on the same channel.
 
-A local v0.11.3 test build attempted to force cleanup by replaying `AnimObjectUnequip` through `NotifyAnimationGraph`. Runtime logs showed `result=false` consistently. That confirms the earlier v0.5 finding: `AnimObjectUnequip` is an animation graph output, not a valid input, so replaying it cannot remove the stale hand object.
+The receiving client therefore processes:
 
-v0.11.3 logs also exposed the actual residual-object mechanism. Helmet Toggle ships an IED NodeMonitor named `Helmet on hand` that watches the `AnimObjectHelmetInvisible` marker under `AnimObjectR`. On an STR proxy, `AnimObjectHelmetInvisible` can be loaded/drawn again after `OffsetGPMAStop`, leaving IED convinced that the helmet is still being held.
+```text
+custom graph variables
+        ↓
+remote STR proxy
+        ↓
+OAR condition cache refresh
+        ↓
+custom animation event, if profiled
+        ↓
+OAR selects the replacement from synchronized state
+```
 
-v0.11.4 therefore cleans the scene graph directly instead of replaying an output event:
+Native Skyrim / STR animation inputs are not globally replayed. This is deliberate: locomotion, normal combat, furniture and other STR-owned behavior must not be double-driven by AnimSync.
 
-- when a remote STR proxy emits `OffsetGPMAStop`, AnimSync marks that proxy's GPMA sequence as stopped and queues removal of `AnimObjectHelmetInvisible` from the proxy's loaded 3D;
-- when a fresh `AnimObjLoad(AnimObjectGPMA)` begins, the stopped state is cleared so the marker is allowed during the next legitimate animation;
-- if `AnimObjLoad` or `AnimObjDraw` recreates `AnimObjectHelmetInvisible` after the stop, AnimSync queues another removal;
-- cleanup is queued through the SKSE task interface so the scene graph is not mutated inside the animation-event dispatch itself;
-- only STR proxies are affected; local players and ordinary NPCs are untouched.
+## Rule profiles
 
-The OAR Animations API and clip-selection diagnostics remain enabled so the selected replacement can still be compared between local player and proxy.
+Profiles are plain text files installed in:
 
-Animations already reproduced natively by STR, such as normal locomotion, sneak, jump and furniture transitions, are not retransmitted.
+```text
+Data/SKSE/Plugins/AnimSyncTogether/Rules/
+```
 
-## Runtime dependency
+Files may use `.rule` or `.rules`.
 
+Supported directives:
+
+```text
+# comment
+event CustomAnimationEvent
+bool bCustomVariable
+int iCustomVariable
+float fCustomVariable
+```
+
+- `event` opts one specific graph input into network replay.
+- `bool`, `int` and `float` opt specific graph variables into synchronization.
+- duplicate rules are ignored.
+- conflicting types for the same variable are rejected and logged.
+
+This means a new animation mod can be supported by adding a profile rather than rebuilding AnimSync Together.
+
+### Helmet Toggle 2 profile
+
+v0.12.0 packages:
+
+```text
+SKSE/Plugins/AnimSyncTogether/Rules/HelmetToggle2.rules
+```
+
+with:
+
+```text
+event OffsetGPMA
+event OffsetGPMAStop
+int iGPMAAnimationType
+int iGPMAOffsetType
+```
+
+The previously validated GPMA state embedded in Helmet Toggle event packets is temporarily retained as a redundant compatibility path while the generic graph-variable transport is validated in two-client testing.
+
+If external rule files are missing entirely, AnimSync falls back to the same built-in Helmet Toggle rules so the previously working behavior is not lost.
+
+## Helmet Toggle compatibility history
+
+- v0.11.0 synchronized `iGPMAAnimationType`, `iGPMAOffsetType`, `OffsetGPMA` and `OffsetGPMAStop`, allowing the remote proxy to select the same OAR replacement and animation duration as the local player.
+- v0.11.1 removed the temporary `HT_NPCSpellMonitor` injection and reset stale GPMA graph state on proxy stop outputs.
+- v0.11.2 fixed CommonLib constness in that reset path.
+- v0.11.4 fixed the residual helmet-in-hand display by removing stale `AnimObjectHelmetInvisible` nodes from STR proxy scene graphs, including marker nodes recreated after `OffsetGPMAStop`.
+
+## Runtime dependencies
+
+Core:
+
+- Skyrim Together Reborn
+- SKSE
 - STRPluginMessagingAPI v0.8.2 or newer
-- Helmet Toggle 2
-- Open Animation Replacer with Animations API v1
-- Offset Movement Animation
-- Dynamic Armor Variants
-- Immersive Equipment Displays for Helmet Toggle's hand display
+
+For OAR-driven custom animations:
+
+- Open Animation Replacer
+
+Additional dependencies remain specific to the animation mod being synchronized. For example Helmet Toggle also uses Offset Movement Animation, Dynamic Armor Variants and Immersive Equipment Displays.
 
 ## Logging
 
 Logs are written to:
 
-`Documents/My Games/Skyrim Special Edition/SKSE/AnimSyncTogether.log`
+```text
+Documents/My Games/Skyrim Special Edition/SKSE/AnimSyncTogether.log
+```
 
-Useful v0.11.4 markers:
+Useful v0.12.0 markers:
 
-- `GPMAStateTx ... animationType=... offsetType=...`
-- `AnimTxInput ... stateFlags=... animationType=... offsetType=...`
-- `GPMAStateApply ... animationTypeApplied=true ...`
-- `AnimRxInput ... event='OffsetGPMA' replay=true result=true ...`
-- `GPMAStateReset ... source='network stop'`
-- `GPMAStateAutoReset ... source='proxy graph output'`
-- `GPMAHelmetMarkerCleanup ... removed=... remaining=... reason='proxy OffsetGPMAStop'`
-- `GPMAHelmetMarkerCleanup ... reason='late AnimObjectHelmetInvisible after GPMA stop'`
-- `ClipSelection ... oarReplacement=... oarMod='...' oarSubMod='...' oarPath='...' oarVariant='...'`
+```text
+SyncRules: loading profile=...
+SyncRules: initialized profiles=... events=... graphVariables=...
+GraphVarTx name='...' type=... value=...
+GraphVarRx ... name='...' type=... value=... applied=true
+AnimInput ... event='...' result=true tracked=true
+AnimTxInput event='...'
+AnimRxInput ... event='...' replay=true result=true
+```
 
-The old v0.11.3 marker `GPMAAnimObjectCleanup ... result=false` should no longer appear.
+Helmet Toggle diagnostics remain available:
 
-For a successful stale-marker cleanup, the useful result is normally:
+```text
+GPMAStateTx ...
+GPMAStateApply ...
+GPMAStateReset ...
+GPMAStateAutoReset ...
+GPMAHelmetMarkerCleanup ...
+ClipSelection ...
+```
 
-`GPMAHelmetMarkerCleanup ... removed=1 remaining=false ...`
+For the packaged Helmet Toggle profile, startup should report at least:
 
-If the animation system recreates the marker after the initial stop cleanup, a second cleanup with reason `late AnimObjectHelmetInvisible after GPMA stop` should remove that late copy as well.
+```text
+SyncRules: initialized profiles=1 events=2 graphVariables=2
+```
+
+During a helmet animation, the generic path should additionally show graph variable traffic such as:
+
+```text
+GraphVarTx name='iGPMAAnimationType' type=int value=2
+GraphVarRx ... name='iGPMAAnimationType' type=int value=2 applied=true
+```
+
+while the existing GPMA event replay continues to work.
+
+## Adding another animation mod
+
+The intended workflow is:
+
+1. inspect the mod's OAR conditions and behavior scripts/configuration;
+2. identify custom graph variables that determine replacement selection;
+3. identify custom graph events that are not already reproduced by STR;
+4. add a small `.rules` profile;
+5. compare local and remote `ClipSelection` logs.
+
+Mods that only depend on custom graph variables but use vanilla/STR-owned behavior events may need variable rules only, with no `event` directive at all.
 
 ## Build
 
-Run `build_release.bat` to create:
+Run:
 
-`dist/AnimSyncTogether-v0.11.4.zip`
+```text
+build_release.bat
+```
+
+to create:
+
+```text
+dist/AnimSyncTogether-v0.12.0.zip
+```
+
+The archive includes the DLL and packaged rule profiles.
 
 ## License
 
