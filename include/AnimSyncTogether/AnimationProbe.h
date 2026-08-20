@@ -2,6 +2,7 @@
 
 #include <RE/Skyrim.h>
 
+#include <string>
 #include <unordered_set>
 
 namespace AnimSyncTogether
@@ -23,7 +24,10 @@ namespace AnimSyncTogether
         AnimationProbe() = default;
 
         bool AttachActor(RE::Actor* actor, const char* reason);
+        void QueueHelmetMarkerCleanup(RE::FormID formID, std::string reason);
+        void CleanupHelmetMarker(RE::FormID formID, const std::string& reason);
 
         std::unordered_set<RE::FormID> attachedActors_;
+        std::unordered_set<RE::FormID> stoppedGPMAActors_;
     };
 }
