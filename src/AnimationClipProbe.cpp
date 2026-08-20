@@ -1,5 +1,6 @@
 #include "AnimSyncTogether/AnimationClipProbe.h"
 
+#include <RE/H/hkaAnimationBinding.h>
 #include <RE/H/hkbCharacterData.h>
 #include <RE/H/hkbCharacterSetup.h>
 #include <RE/H/hkbCharacterStringData.h>
