@@ -4,24 +4,16 @@ AnimSync Together is an experimental SKSE/CommonLibSSE-NG plugin for Skyrim Spec
 
 ## Status
 
-**v0.9.2 — OAR clip-selection diagnostics (CommonLib flatrim compatibility)**
+**v0.10.0 — OAR condition-cache refresh + replacement diagnostics**
 
-The STRPM transport, proxy resolution and behavior replay path are validated. `OffsetGPMA` reaches the remote STR proxy, returns `true`, and the proxy emits the expected GPMA graph events (`AnimObjectUnequip`, `AnimObjLoad`, `AnimObjDraw`).
+The STRPM transport, proxy resolution and `OffsetGPMA` replay path are validated. v0.9.2 proved that the local PlayerCharacter and the STR proxy do not receive the same effective OAR replacement for `Animations\GPMAOffsetAnimation.hkx`:
 
-v0.8.0 also confirmed that `HT_NPCSpellMonitor` can be resolved and added successfully to STR proxies, but the Helmet Toggle 2 animation is still visually absent.
+- local PlayerCharacter: effective clip duration around 3.3 seconds;
+- STR proxy: effective clip duration around 9.133 seconds and an internal `OffsetGPMAStop` roughly 0.2 seconds after activation.
 
-A key runtime difference remains: the remote proxy falls back to a very short GPMA sequence while the local player runs the full Helmet Toggle animation. v0.9.x therefore hooks `hkbClipGenerator::Activate` after OAR has installed its own hook and logs the animation binding selected during a 1.5 second window around `OffsetGPMA`.
+`HT_NPCSpellMonitor` is present on the STR proxy, so v0.10.0 integrates the official Open Animation Replacer Animations API and explicitly clears OAR condition state for the proxy after AnimSync injects that spell and again immediately before a remote `OffsetGPMA` replay. This forces OAR to re-evaluate replacement conditions using the proxy's current state instead of potentially reusing condition state created before the monitor spell was added.
 
-For each relevant clip activation AnimSync logs:
-
-- the binding index before activation;
-- the binding index selected after the chained activation hook;
-- whether that binding index changed;
-- the clip generator animation name;
-- the resulting animation duration;
-- the actor and whether it is the local player or an STR proxy.
-
-v0.9.2 removes the diagnostic dependency on `hkbCharacterSetup`, `hkbCharacterData` and `hkbCharacterStringData`, because those internal headers are not shipped by the `commonlibsse-ng-flatrim` 3.5.3 package used by the project. The remaining diagnostics are sufficient to compare OAR selection between the local PlayerCharacter and the STR proxy without relying on unavailable Havok internals.
+v0.10.0 also queries OAR's `GetCurrentReplacementAnimationInfo` API for each GPMA clip activation and logs the selected replacement's mod, submod, animation path and variant. This makes it possible to compare the exact Helmet Toggle replacement chosen for the local player and remote proxy.
 
 The synchronized behavior inputs remain:
 
@@ -34,7 +26,7 @@ Animations already reproduced natively by STR, such as sneak, jump and furniture
 
 - STRPluginMessagingAPI v0.8.2 or newer
 - Helmet Toggle 2
-- Open Animation Replacer
+- Open Animation Replacer with Animations API v1
 - Offset Movement Animation
 - Dynamic Armor Variants
 
@@ -44,11 +36,13 @@ Logs are written to:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/AnimSyncTogether.log`
 
-Useful v0.9.2 markers:
+Useful v0.10.0 markers:
 
+- `OARClient: OAR Animations API v1 connected`
+- `OARConditionCache: cleared actor=...`
 - `ClipProbeArm actor=... reason='local OffsetGPMA'`
 - `ClipProbeArm actor=... reason='remote OffsetGPMA'`
-- `ClipSelection ... beforeIndex=... selectedIndex=... replaced=... clipName='...' duration=...`
+- `ClipSelection ... duration=... oarReplacement=... oarMod='...' oarSubMod='...' oarPath='...' oarVariant='...'`
 - `GPMAState ... variable='iGPMAOffsetType' ...`
 - `AnimTxInput event='OffsetGPMA'`
 - `AnimRxInput ... event='OffsetGPMA' replay=true result=true`
@@ -58,7 +52,7 @@ Useful v0.9.2 markers:
 
 Run `build_release.bat` to create:
 
-`dist/AnimSyncTogether-v0.9.2.zip`
+`dist/AnimSyncTogether-v0.10.0.zip`
 
 ## License
 
