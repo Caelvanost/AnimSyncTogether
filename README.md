@@ -4,13 +4,13 @@ AnimSync Together is an experimental SKSE/CommonLibSSE-NG plugin for Skyrim Spec
 
 ## Status
 
-**v0.9.0 — OAR clip-selection diagnostics**
+**v0.9.1 — OAR clip-selection diagnostics (compile fix)**
 
 The STRPM transport, proxy resolution and behavior replay path are validated. `OffsetGPMA` reaches the remote STR proxy, returns `true`, and the proxy emits the expected GPMA graph events (`AnimObjectUnequip`, `AnimObjLoad`, `AnimObjDraw`).
 
 v0.8.0 also confirmed that `HT_NPCSpellMonitor` can be resolved and added successfully to STR proxies, but the Helmet Toggle 2 animation is still visually absent.
 
-A key runtime difference remains: the remote proxy falls back to a very short GPMA sequence while the local player runs the full Helmet Toggle animation. v0.9.0 therefore hooks `hkbClipGenerator::Activate` after OAR has installed its own hook and logs the final animation binding selected by OAR during a 1.5 second window around `OffsetGPMA`.
+A key runtime difference remains: the remote proxy falls back to a very short GPMA sequence while the local player runs the full Helmet Toggle animation. v0.9.x therefore hooks `hkbClipGenerator::Activate` after OAR has installed its own hook and logs the final animation binding selected by OAR during a 1.5 second window around `OffsetGPMA`.
 
 For each relevant clip activation AnimSync logs:
 
@@ -19,6 +19,8 @@ For each relevant clip activation AnimSync logs:
 - the selected HKX path from `hkbCharacterStringData::animationNames`;
 - the resulting animation duration;
 - the actor and whether it is the local player or an STR proxy.
+
+v0.9.1 fixes the CommonLib include chain required to access `hkbCharacterSetup`, `hkbCharacterData` and `hkbCharacterStringData` in the clip diagnostic code. There is no runtime behavior change from v0.9.0 beyond making that diagnostic build correctly.
 
 The synchronized behavior inputs remain:
 
@@ -41,7 +43,7 @@ Logs are written to:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/AnimSyncTogether.log`
 
-Useful v0.9.0 markers:
+Useful v0.9.1 markers:
 
 - `ClipProbeArm actor=... reason='local OffsetGPMA'`
 - `ClipProbeArm actor=... reason='remote OffsetGPMA'`
@@ -55,7 +57,7 @@ Useful v0.9.0 markers:
 
 Run `build_release.bat` to create:
 
-`dist/AnimSyncTogether-v0.9.0.zip`
+`dist/AnimSyncTogether-v0.9.1.zip`
 
 ## License
 
