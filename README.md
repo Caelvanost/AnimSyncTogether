@@ -4,11 +4,21 @@ AnimSync Together is an experimental SKSE/CommonLibSSE-NG plugin for Skyrim Spec
 
 ## Status
 
-**v0.8.0 — Helmet Toggle NPC/OAR compatibility probe**
+**v0.9.0 — OAR clip-selection diagnostics**
 
-The STRPM transport and proxy replay path are validated. In v0.7.0, `OffsetGPMA` reached the remote STR proxy, returned `true`, and produced the expected GPMA graph outputs (`AnimObjectUnequip`, `AnimObjLoad`, `AnimObjDraw`). The animation was still visually absent, which points to OAR selecting the generic GPMA behavior instead of Helmet Toggle 2's NPC animation replacement.
+The STRPM transport, proxy resolution and behavior replay path are validated. `OffsetGPMA` reaches the remote STR proxy, returns `true`, and the proxy emits the expected GPMA graph events (`AnimObjectUnequip`, `AnimObjLoad`, `AnimObjDraw`).
 
-Helmet Toggle 2 documents that NPC/follower animations are enabled through monitor spells such as `HT_NPCSpellMonitor`. v0.8.0 therefore resolves `HT_NPCSpellMonitor` by EditorID and temporarily adds it to STR proxy actors while their STRPM mapping exists. AnimSync only removes the spell if AnimSync itself added it.
+v0.8.0 also confirmed that `HT_NPCSpellMonitor` can be resolved and added successfully to STR proxies, but the Helmet Toggle 2 animation is still visually absent.
+
+A key runtime difference remains: the remote proxy falls back to a very short GPMA sequence while the local player runs the full Helmet Toggle animation. v0.9.0 therefore hooks `hkbClipGenerator::Activate` after OAR has installed its own hook and logs the final animation binding selected by OAR during a 1.5 second window around `OffsetGPMA`.
+
+For each relevant clip activation AnimSync logs:
+
+- the original and final animation binding indexes;
+- whether OAR changed the binding;
+- the selected HKX path from `hkbCharacterStringData::animationNames`;
+- the resulting animation duration;
+- the actor and whether it is the local player or an STR proxy.
 
 The synchronized behavior inputs remain:
 
@@ -25,27 +35,27 @@ Animations already reproduced natively by STR, such as sneak, jump and furniture
 - Offset Movement Animation
 - Dynamic Armor Variants
 
-If `HT_NPCSpellMonitor` cannot be found, AnimSync logs a warning and leaves the proxy unchanged.
-
 ## Logging
 
 Logs are written to:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/AnimSyncTogether.log`
 
-Useful v0.8.0 markers:
+Useful v0.9.0 markers:
 
+- `ClipProbeArm actor=... reason='local OffsetGPMA'`
+- `ClipProbeArm actor=... reason='remote OffsetGPMA'`
+- `ClipSelection ... beforeIndex=... selectedIndex=... replaced=... file='...' duration=...`
+- `GPMAState ... variable='iGPMAOffsetType' ...`
 - `AnimTxInput event='OffsetGPMA'`
 - `AnimRxInput ... event='OffsetGPMA' replay=true result=true`
 - `HelmetToggleCompat: add spell ... result=true`
-- `HelmetToggleCompat: spell 'HT_NPCSpellMonitor' not found`
-- `HelmetToggleCompat: remove spell ...`
 
 ## Build
 
 Run `build_release.bat` to create:
 
-`dist/AnimSyncTogether-v0.8.0.zip`
+`dist/AnimSyncTogether-v0.9.0.zip`
 
 ## License
 
