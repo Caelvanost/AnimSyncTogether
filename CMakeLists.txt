@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(
     AnimSyncTogether
-    VERSION 0.8.0
+    VERSION 0.9.0
     LANGUAGES CXX
 )
 
@@ -15,6 +15,7 @@ find_package(CommonLibSSE CONFIG REQUIRED)
 add_commonlibsse_plugin(${PROJECT_NAME}
     SOURCES
         src/main.cpp
+        src/AnimationClipProbe.cpp
         src/AnimationInputProbe.cpp
         src/AnimationProbe.cpp
         src/STRPMApi.cpp
