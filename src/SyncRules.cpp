@@ -207,9 +207,10 @@ namespace AnimSyncTogether
                 }
 
                 ++configCount;
-                const std::string content(
-                    std::istreambuf_iterator<char>(input),
-                    std::istreambuf_iterator<char>());
+                const std::string content{
+                    std::istreambuf_iterator<char>{ input },
+                    std::istreambuf_iterator<char>{}
+                };
                 ExtractGraphVariableNames(content, it->path().string(), discovered);
             }
         }
