@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set "VERSION=0.11.4"
+set "VERSION=0.12.0"
 pushd "%~dp0" >nul
 set "ROOT=%CD%"
 set "BUILD=%ROOT%\build"
