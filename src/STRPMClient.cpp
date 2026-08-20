@@ -15,12 +15,17 @@ namespace AnimSyncTogether
     namespace
     {
         constexpr char kAnimationChannel[] = "caelvanost.animsynctogether.anim.v1";
-        constexpr std::uint32_t kAnimationPacketVersion = 1;
+        constexpr std::uint32_t kAnimationPacketVersion = 2;
+        constexpr std::uint32_t kStateHasGPMAAnimationType = 1u << 0;
+        constexpr std::uint32_t kStateHasGPMAOffsetType = 1u << 1;
         constexpr std::string_view kHelmetToggleNPCSpellEditorID = "HT_NPCSpellMonitor";
 
         struct AnimationPacket
         {
             std::uint32_t version{ kAnimationPacketVersion };
+            std::uint32_t stateFlags{ 0 };
+            std::int32_t gpmaAnimationType{ 0 };
+            std::int32_t gpmaOffsetType{ 0 };
             std::array<char, 64> tag{};
             std::array<char, 128> payload{};
         };
@@ -73,7 +78,10 @@ namespace AnimSyncTogether
                 return false;
             }
             channelRegistered_ = true;
-            SKSE::log::info("STRPMClient: animation channel registered '{}'; input replay enabled", kAnimationChannel);
+            SKSE::log::info(
+                "STRPMClient: animation channel registered '{}'; GPMA state replay enabled packetVersion={}",
+                kAnimationChannel,
+                kAnimationPacketVersion);
         }
 
         if (!resolver_) {
@@ -115,13 +123,27 @@ namespace AnimSyncTogether
         return it->second;
     }
 
-    bool STRPMClient::SendAnimationEvent(std::string_view tag, std::string_view payload)
+    bool STRPMClient::SendAnimationEvent(
+        std::string_view tag,
+        std::string_view payload,
+        std::int32_t gpmaAnimationType,
+        bool hasGPMAAnimationType,
+        std::int32_t gpmaOffsetType,
+        bool hasGPMAOffsetType)
     {
         if (!messaging_ || !channelRegistered_) {
             return false;
         }
 
         AnimationPacket packet{};
+        if (hasGPMAAnimationType) {
+            packet.stateFlags |= kStateHasGPMAAnimationType;
+            packet.gpmaAnimationType = gpmaAnimationType;
+        }
+        if (hasGPMAOffsetType) {
+            packet.stateFlags |= kStateHasGPMAOffsetType;
+            packet.gpmaOffsetType = gpmaOffsetType;
+        }
         CopyField(packet.tag, tag);
         CopyField(packet.payload, payload);
 
@@ -140,14 +162,18 @@ namespace AnimSyncTogether
 
         if (result != STRPM::Result::kOk) {
             SKSE::log::warn(
-                "STRPMClient: animation send failed tag='{}' payload='{}' result={}",
+                "STRPMClient: animation send failed event='{}' result={}",
                 tag,
-                payload,
                 STRPM::ResultToString(result));
             return false;
         }
 
-        SKSE::log::info("AnimTxInput event='{}' payload='{}'", tag, payload);
+        SKSE::log::info(
+            "AnimTxInput event='{}' stateFlags=0x{:X} animationType={} offsetType={}",
+            tag,
+            packet.stateFlags,
+            packet.gpmaAnimationType,
+            packet.gpmaOffsetType);
         return true;
     }
 
@@ -169,13 +195,19 @@ namespace AnimSyncTogether
         static_cast<STRPMClient*>(userData)->QueueAnimationMessage(
             message->sender.connectionID,
             tag,
-            payload);
+            payload,
+            packet->stateFlags,
+            packet->gpmaAnimationType,
+            packet->gpmaOffsetType);
     }
 
     void STRPMClient::QueueAnimationMessage(
         STRPM::ConnectionID senderConnectionID,
         std::string tag,
-        std::string payload)
+        std::string payload,
+        std::uint32_t stateFlags,
+        std::int32_t gpmaAnimationType,
+        std::int32_t gpmaOffsetType)
     {
         auto* tasks = SKSE::GetTaskInterface();
         if (!tasks) {
@@ -187,15 +219,27 @@ namespace AnimSyncTogether
             this,
             senderConnectionID,
             tag = std::move(tag),
-            payload = std::move(payload)]() {
-            ApplyAnimationMessage(senderConnectionID, tag, payload);
+            payload = std::move(payload),
+            stateFlags,
+            gpmaAnimationType,
+            gpmaOffsetType]() {
+            ApplyAnimationMessage(
+                senderConnectionID,
+                tag,
+                payload,
+                stateFlags,
+                gpmaAnimationType,
+                gpmaOffsetType);
         });
     }
 
     void STRPMClient::ApplyAnimationMessage(
         STRPM::ConnectionID senderConnectionID,
         const std::string& tag,
-        const std::string& payload)
+        const std::string& payload,
+        std::uint32_t stateFlags,
+        std::int32_t gpmaAnimationType,
+        std::int32_t gpmaOffsetType)
     {
         (void)payload;
 
@@ -236,34 +280,58 @@ namespace AnimSyncTogether
 
         EnsureHelmetToggleNPCSpell(actor);
 
+        const RE::BSFixedString animationTypeVariable{ "iGPMAAnimationType" };
+        const RE::BSFixedString offsetTypeVariable{ "iGPMAOffsetType" };
+
         if (tag == "OffsetGPMA") {
-            // OAR may have evaluated and cached Helmet Toggle NPC conditions before
-            // AnimSync injected HT_NPCSpellMonitor. Force a fresh condition evaluation
-            // immediately before activating the GPMA clip on the STR proxy.
-            OARClient::GetSingleton()->ClearConditionStateData(actor);
+            bool animationTypeApplied = false;
+            bool offsetTypeApplied = false;
 
-            AnimationClipProbe::ArmActor(formID, "remote OffsetGPMA");
+            if ((stateFlags & kStateHasGPMAAnimationType) != 0) {
+                animationTypeApplied = actor->SetGraphVariableInt(animationTypeVariable, gpmaAnimationType);
+            }
+            if ((stateFlags & kStateHasGPMAOffsetType) != 0) {
+                offsetTypeApplied = actor->SetGraphVariableInt(offsetTypeVariable, gpmaOffsetType);
+            }
 
-            std::int32_t offsetType = 0;
-            const RE::BSFixedString offsetTypeVariable{ "iGPMAOffsetType" };
-            const bool hasOffsetType = actor->GetGraphVariableInt(offsetTypeVariable, offsetType);
             SKSE::log::info(
-                "GPMAState actor={:08X} localPlayer=false variable='iGPMAOffsetType' present={} value={}",
+                "GPMAStateApply actor={:08X} event='OffsetGPMA' animationTypePresent={} animationType={} animationTypeApplied={} offsetTypePresent={} offsetType={} offsetTypeApplied={}",
                 formID,
-                hasOffsetType,
-                offsetType);
+                (stateFlags & kStateHasGPMAAnimationType) != 0,
+                gpmaAnimationType,
+                animationTypeApplied,
+                (stateFlags & kStateHasGPMAOffsetType) != 0,
+                gpmaOffsetType,
+                offsetTypeApplied);
+
+            // The graph variables must exist before OAR evaluates the GPMA clip.
+            OARClient::GetSingleton()->ClearConditionStateData(actor);
+            AnimationClipProbe::ArmActor(formID, "remote OffsetGPMA with GPMA state");
         }
 
-        const RE::BSFixedString inputEvent{ tag };
+        const RE::BSFixedString inputEvent{ tag.c_str() };
         const bool replayed = actor->NotifyAnimationGraph(inputEvent);
 
         SKSE::log::info(
-            "AnimRxInput sender={} proxy={:08X} actor='{}' event='{}' replay=true result={}",
+            "AnimRxInput sender={} proxy={:08X} actor='{}' event='{}' replay=true result={} stateFlags=0x{:X} animationType={} offsetType={}",
             senderConnectionID,
             formID,
             actor->GetName(),
             tag,
-            replayed);
+            replayed,
+            stateFlags,
+            gpmaAnimationType,
+            gpmaOffsetType);
+
+        if (tag == "OffsetGPMAStop") {
+            // Helmet Toggle sends OffsetGPMAStop first and resets the animation
+            // type afterwards. Mirror that ordering on the remote proxy.
+            const bool reset = actor->SetGraphVariableInt(animationTypeVariable, 0);
+            SKSE::log::info(
+                "GPMAStateReset actor={:08X} variable='iGPMAAnimationType' value=0 result={}",
+                formID,
+                reset);
+        }
     }
 
     void STRPMClient::EnsureHelmetToggleNPCSpell(RE::Actor* actor)
