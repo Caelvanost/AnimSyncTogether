@@ -4,14 +4,6 @@
 
 namespace AnimSyncTogether
 {
-    namespace
-    {
-        bool IsHelmetReplayTrigger(std::string_view tag, std::string_view payload)
-        {
-            return tag == "AnimObjLoad" && payload == "AnimObjectGPMA";
-        }
-    }
-
     AnimationProbe* AnimationProbe::GetSingleton()
     {
         static AnimationProbe singleton;
@@ -145,14 +137,8 @@ namespace AnimSyncTogether
             tag,
             payload);
 
-        // AnimObjLoad + AnimObjectGPMA is the first stable output marker of the
-        // Helmet Toggle animation sequence. Send only this marker so the remote
-        // client can start the behavior once instead of replaying every output
-        // event emitted by the graph.
-        if (isLocalPlayer && IsHelmetReplayTrigger(tag, payload)) {
-            STRPMClient::GetSingleton()->SendAnimationEvent(tag, payload);
-        }
-
+        // Output events are diagnostic only. v0.7.0 transports the actual
+        // PlayerCharacter graph inputs captured by AnimationInputProbe.
         return RE::BSEventNotifyControl::kContinue;
     }
 }
