@@ -6,7 +6,9 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <sstream>
+#include <utility>
 
 namespace AnimSyncTogether
 {
@@ -44,6 +46,39 @@ namespace AnimSyncTogether
                 return "unknown";
             }
         }
+
+        void ExtractGraphVariableNames(
+            const std::string& content,
+            const std::string& sourcePath,
+            std::unordered_map<std::string, std::string>& discovered)
+        {
+            constexpr std::string_view key = "\"graphVariable\"";
+            std::size_t position = 0;
+
+            while ((position = content.find(key, position)) != std::string::npos) {
+                const auto colon = content.find(':', position + key.size());
+                if (colon == std::string::npos) {
+                    break;
+                }
+
+                const auto quoteStart = content.find('"', colon + 1);
+                if (quoteStart == std::string::npos) {
+                    break;
+                }
+
+                const auto quoteEnd = content.find('"', quoteStart + 1);
+                if (quoteEnd == std::string::npos) {
+                    break;
+                }
+
+                const auto name = content.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
+                if (!name.empty()) {
+                    discovered.try_emplace(name, sourcePath);
+                }
+
+                position = quoteEnd + 1;
+            }
+        }
     }
 
     SyncRules* SyncRules::GetSingleton()
@@ -66,6 +101,8 @@ namespace AnimSyncTogether
             SKSE::log::warn(
                 "SyncRules: no external profiles loaded; using built-in Helmet Toggle fallback");
         }
+
+        DiscoverOARGraphVariables();
 
         SKSE::log::info(
             "SyncRules: initialized profiles={} events={} graphVariables={}",
@@ -134,6 +171,68 @@ namespace AnimSyncTogether
         std::sort(files.begin(), files.end());
         for (const auto& file : files) {
             ParseRuleFile(file.string(), file.stem().string());
+        }
+    }
+
+    void SyncRules::DiscoverOARGraphVariables()
+    {
+        namespace fs = std::filesystem;
+
+        const std::array<fs::path, 2> roots{
+            fs::path("Data") / "meshes" / "OpenAnimationReplacer",
+            fs::path("Data") / "meshes" / "actors" / "character" / "animations" / "OpenAnimationReplacer"
+        };
+
+        std::unordered_map<std::string, std::string> discovered;
+        std::uint32_t configCount = 0;
+
+        for (const auto& root : roots) {
+            std::error_code ec;
+            if (!fs::exists(root, ec) || !fs::is_directory(root, ec)) {
+                continue;
+            }
+
+            for (fs::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec)) {
+                if (!it->is_regular_file()) {
+                    continue;
+                }
+
+                if (ToLower(it->path().filename().string()) != "config.json") {
+                    continue;
+                }
+
+                std::ifstream input(it->path(), std::ios::binary);
+                if (!input) {
+                    continue;
+                }
+
+                ++configCount;
+                const std::string content(
+                    std::istreambuf_iterator<char>(input),
+                    std::istreambuf_iterator<char>());
+                ExtractGraphVariableNames(content, it->path().string(), discovered);
+            }
+        }
+
+        std::vector<std::pair<std::string, std::string>> candidates(
+            discovered.begin(),
+            discovered.end());
+        std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
+            return lhs.first < rhs.first;
+        });
+
+        SKSE::log::info(
+            "OARVarDiscovery: configs={} uniqueGraphVariables={}",
+            configCount,
+            candidates.size());
+
+        for (const auto& [name, source] : candidates) {
+            const bool profiled = variableTypes_.contains(name);
+            SKSE::log::info(
+                "OARVarCandidate name='{}' profiled={} source='{}'",
+                name,
+                profiled,
+                source);
         }
     }
 
