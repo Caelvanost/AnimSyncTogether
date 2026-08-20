@@ -32,16 +32,28 @@ namespace AnimSyncTogether
     {
         const std::string_view name = eventName.c_str();
 
-        if (name == "OffsetGPMA") {
-            AnimationClipProbe::ArmActor(0x14, "local OffsetGPMA");
+        std::int32_t animationType = 0;
+        std::int32_t offsetType = 0;
+        bool hasAnimationType = false;
+        bool hasOffsetType = false;
 
-            std::int32_t offsetType = 0;
+        if (IsHelmetInput(name)) {
+            const RE::BSFixedString animationTypeVariable{ "iGPMAAnimationType" };
             const RE::BSFixedString offsetTypeVariable{ "iGPMAOffsetType" };
-            const bool hasOffsetType = holder && holder->GetGraphVariableInt(offsetTypeVariable, offsetType);
+            hasAnimationType = holder && holder->GetGraphVariableInt(animationTypeVariable, animationType);
+            hasOffsetType = holder && holder->GetGraphVariableInt(offsetTypeVariable, offsetType);
+
             SKSE::log::info(
-                "GPMAState actor=00000014 localPlayer=true variable='iGPMAOffsetType' present={} value={}",
+                "GPMAStateTx actor=00000014 event='{}' animationTypePresent={} animationType={} offsetTypePresent={} offsetType={}",
+                name,
+                hasAnimationType,
+                animationType,
                 hasOffsetType,
                 offsetType);
+        }
+
+        if (name == "OffsetGPMA") {
+            AnimationClipProbe::ArmActor(0x14, "local OffsetGPMA");
         }
 
         const auto result = originalPlayerNotify_(holder, eventName);
@@ -51,11 +63,17 @@ namespace AnimSyncTogether
             name,
             result);
 
-        // v0.6.0 diagnostics established that OffsetGPMA is the actual graph
-        // input that starts the helmet-removal sequence. OffsetGPMAStop ends it.
-        // Only forward inputs that the local PlayerCharacter graph accepted.
+        // Helmet Toggle writes iGPMAAnimationType/iGPMAOffsetType before
+        // OffsetGPMA, then sends OffsetGPMAStop before resetting animation type.
+        // Capture the state before the graph call and only transmit accepted inputs.
         if (result && IsHelmetInput(name)) {
-            STRPMClient::GetSingleton()->SendAnimationEvent(name, {});
+            STRPMClient::GetSingleton()->SendAnimationEvent(
+                name,
+                {},
+                animationType,
+                hasAnimationType,
+                offsetType,
+                hasOffsetType);
         }
 
         return result;
