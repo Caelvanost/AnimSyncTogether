@@ -115,12 +115,17 @@ namespace AnimSyncTogether
             return RE::BSEventNotifyControl::kContinue;
         }
 
-        auto* actor = event->holder->As<RE::Actor>();
+        const auto* eventActor = event->holder->As<RE::Actor>();
+        if (!eventActor) {
+            return RE::BSEventNotifyControl::kContinue;
+        }
+
+        const auto formID = eventActor->GetFormID();
+        auto* actor = RE::TESForm::LookupByID<RE::Actor>(formID);
         if (!actor) {
             return RE::BSEventNotifyControl::kContinue;
         }
 
-        const auto formID = actor->GetFormID();
         const auto* base = actor->GetActorBase();
         const auto isLocalPlayer = actor == RE::PlayerCharacter::GetSingleton();
         const auto connectionID = STRPMClient::GetSingleton()->FindConnectionID(formID);
