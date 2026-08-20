@@ -115,7 +115,7 @@ namespace AnimSyncTogether
             return RE::BSEventNotifyControl::kContinue;
         }
 
-        const auto* actor = event->holder->As<RE::Actor>();
+        auto* actor = event->holder->As<RE::Actor>();
         if (!actor) {
             return RE::BSEventNotifyControl::kContinue;
         }
@@ -137,8 +137,26 @@ namespace AnimSyncTogether
             tag,
             payload);
 
-        // Output events are diagnostic only. v0.7.0 transports the actual
-        // PlayerCharacter graph inputs captured by AnimationInputProbe.
+        // Some GPMA clips emit OffsetGPMAStop internally before the original
+        // player's explicit stop input is accepted/transmitted. Reset the remote
+        // STR proxy's selection state on that output so iGPMAAnimationType never
+        // remains stuck at the previous Helmet Toggle action.
+        if (!isLocalPlayer && connectionID.has_value() && tag == "OffsetGPMAStop") {
+            const RE::BSFixedString animationTypeVariable{ "iGPMAAnimationType" };
+            std::int32_t previousValue = 0;
+            const bool hadValue = actor->GetGraphVariableInt(animationTypeVariable, previousValue);
+            const bool reset = actor->SetGraphVariableInt(animationTypeVariable, 0);
+            SKSE::log::info(
+                "GPMAStateAutoReset actor={:08X} remoteConnection={} variable='iGPMAAnimationType' previousPresent={} previousValue={} value=0 result={} source='proxy graph output'",
+                formID,
+                connectionID.value(),
+                hadValue,
+                previousValue,
+                reset);
+        }
+
+        // Output events are diagnostic only. Never retransmit remote proxy outputs;
+        // graph inputs and their required GPMA state are transported separately.
         return RE::BSEventNotifyControl::kContinue;
     }
 }
