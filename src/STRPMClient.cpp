@@ -18,7 +18,6 @@ namespace AnimSyncTogether
         constexpr std::uint32_t kAnimationPacketVersion = 2;
         constexpr std::uint32_t kStateHasGPMAAnimationType = 1u << 0;
         constexpr std::uint32_t kStateHasGPMAOffsetType = 1u << 1;
-        constexpr std::string_view kHelmetToggleNPCSpellEditorID = "HT_NPCSpellMonitor";
 
         struct AnimationPacket
         {
@@ -278,8 +277,6 @@ namespace AnimSyncTogether
             return;
         }
 
-        EnsureHelmetToggleNPCSpell(actor);
-
         const RE::BSFixedString animationTypeVariable{ "iGPMAAnimationType" };
         const RE::BSFixedString offsetTypeVariable{ "iGPMAOffsetType" };
 
@@ -325,77 +322,13 @@ namespace AnimSyncTogether
 
         if (tag == "OffsetGPMAStop") {
             // Helmet Toggle sends OffsetGPMAStop first and resets the animation
-            // type afterwards. Mirror that ordering on the remote proxy.
+            // type afterwards. Mirror that ordering when the stop is transported.
             const bool reset = actor->SetGraphVariableInt(animationTypeVariable, 0);
             SKSE::log::info(
-                "GPMAStateReset actor={:08X} variable='iGPMAAnimationType' value=0 result={}",
+                "GPMAStateReset actor={:08X} variable='iGPMAAnimationType' value=0 result={} source='network stop'",
                 formID,
                 reset);
         }
-    }
-
-    void STRPMClient::EnsureHelmetToggleNPCSpell(RE::Actor* actor)
-    {
-        if (!actor) {
-            return;
-        }
-
-        auto* spell = RE::TESForm::LookupByEditorID<RE::SpellItem>(kHelmetToggleNPCSpellEditorID);
-        if (!spell) {
-            SKSE::log::warn(
-                "HelmetToggleCompat: spell '{}' not found; OAR NPC conditions may remain unsatisfied",
-                kHelmetToggleNPCSpellEditorID);
-            return;
-        }
-
-        const auto formID = actor->GetFormID();
-        if (actor->HasSpell(spell)) {
-            SKSE::log::debug(
-                "HelmetToggleCompat: proxy {:08X} '{}' already has spell '{}'",
-                formID,
-                actor->GetName(),
-                kHelmetToggleNPCSpellEditorID);
-            return;
-        }
-
-        const bool added = actor->AddSpell(spell);
-        SKSE::log::info(
-            "HelmetToggleCompat: add spell proxy={:08X} actor='{}' spell='{}' result={}",
-            formID,
-            actor->GetName(),
-            kHelmetToggleNPCSpellEditorID,
-            added);
-
-        if (added) {
-            injectedHelmetToggleSpellActors_.insert(formID);
-            OARClient::GetSingleton()->ClearConditionStateData(actor);
-        }
-    }
-
-    void STRPMClient::RemoveInjectedHelmetToggleNPCSpell(RE::FormID formID)
-    {
-        if (!injectedHelmetToggleSpellActors_.erase(formID)) {
-            return;
-        }
-
-        auto* actor = RE::TESForm::LookupByID<RE::Actor>(formID);
-        auto* spell = RE::TESForm::LookupByEditorID<RE::SpellItem>(kHelmetToggleNPCSpellEditorID);
-        if (!actor || !spell) {
-            SKSE::log::info(
-                "HelmetToggleCompat: cleanup skipped proxy={:08X} actorPresent={} spellPresent={}",
-                formID,
-                actor != nullptr,
-                spell != nullptr);
-            return;
-        }
-
-        const bool removed = actor->RemoveSpell(spell);
-        SKSE::log::info(
-            "HelmetToggleCompat: remove spell proxy={:08X} actor='{}' spell='{}' result={}",
-            formID,
-            actor->GetName(),
-            kHelmetToggleNPCSpellEditorID,
-            removed);
     }
 
     void STRPM_CALL STRPMClient::OnProxyMappingChanged(
@@ -430,7 +363,6 @@ namespace AnimSyncTogether
         case STRPM::ProxyMappingEventType::kAdded:
         case STRPM::ProxyMappingEventType::kUpdated:
             if (event.oldFormID != STRPM::kInvalidProxyFormID && event.oldFormID != event.newFormID) {
-                RemoveInjectedHelmetToggleNPCSpell(event.oldFormID);
                 probe->DetachActorByFormID(event.oldFormID, "STRPM mapping replaced");
                 formIDToConnection_.erase(event.oldFormID);
             }
@@ -448,15 +380,11 @@ namespace AnimSyncTogether
                 event.connectionID,
                 event.newFormID);
 
-            if (auto* actor = RE::TESForm::LookupByID<RE::Actor>(event.newFormID)) {
-                EnsureHelmetToggleNPCSpell(actor);
-            }
             probe->AttachActorByFormID(event.newFormID, "STRPM proxy mapping");
             break;
 
         case STRPM::ProxyMappingEventType::kRemoved:
             if (event.oldFormID != STRPM::kInvalidProxyFormID) {
-                RemoveInjectedHelmetToggleNPCSpell(event.oldFormID);
                 probe->DetachActorByFormID(event.oldFormID, "STRPM mapping removed");
                 formIDToConnection_.erase(event.oldFormID);
             }
@@ -470,12 +398,10 @@ namespace AnimSyncTogether
         case STRPM::ProxyMappingEventType::kCleared:
             for (const auto& [formID, connectionID] : formIDToConnection_) {
                 (void)connectionID;
-                RemoveInjectedHelmetToggleNPCSpell(formID);
                 probe->DetachActorByFormID(formID, "STRPM mappings cleared");
             }
             connectionToFormID_.clear();
             formIDToConnection_.clear();
-            injectedHelmetToggleSpellActors_.clear();
             SKSE::log::info("STRPMClient: proxy mappings cleared");
             break;
         }
