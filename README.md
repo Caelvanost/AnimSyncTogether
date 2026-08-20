@@ -88,6 +88,21 @@ The previously validated GPMA state embedded in Helmet Toggle event packets is t
 
 If external rule files are missing entirely, AnimSync falls back to the same built-in Helmet Toggle rules so the previously working behavior is not lost.
 
+## OAR variable discovery diagnostics
+
+At startup, v0.12.0 scans deployed OAR `config.json` files under the common OAR animation roots and extracts referenced `graphVariable` names for diagnostics only.
+
+Discovered variables are **not synchronized automatically**. This prevents AnimSync from accidentally taking ownership of vanilla locomotion/combat graph state that STR already manages.
+
+Useful markers:
+
+```text
+OARVarDiscovery: configs=... uniqueGraphVariables=...
+OARVarCandidate name='...' profiled=false source='Data\\meshes\\OpenAnimationReplacer\\...\\config.json'
+```
+
+The source path makes it possible to identify variables belonging to a specific animation mod, then add only the required ones to that mod's `.rules` profile.
+
 ## Helmet Toggle compatibility history
 
 - v0.11.0 synchronized `iGPMAAnimationType`, `iGPMAOffsetType`, `OffsetGPMA` and `OffsetGPMAStop`, allowing the remote proxy to select the same OAR replacement and animation duration as the local player.
@@ -122,6 +137,8 @@ Useful v0.12.0 markers:
 ```text
 SyncRules: loading profile=...
 SyncRules: initialized profiles=... events=... graphVariables=...
+OARVarDiscovery: configs=... uniqueGraphVariables=...
+OARVarCandidate name='...' profiled=... source='...'
 GraphVarTx name='...' type=... value=...
 GraphVarRx ... name='...' type=... value=... applied=true
 AnimInput ... event='...' result=true tracked=true
@@ -160,10 +177,10 @@ while the existing GPMA event replay continues to work.
 The intended workflow is:
 
 1. inspect the mod's OAR conditions and behavior scripts/configuration;
-2. identify custom graph variables that determine replacement selection;
+2. use `OARVarCandidate` diagnostics to identify candidate custom graph variables;
 3. identify custom graph events that are not already reproduced by STR;
 4. add a small `.rules` profile;
-5. compare local and remote `ClipSelection` logs.
+5. compare local and remote animation behavior and `ClipSelection` diagnostics.
 
 Mods that only depend on custom graph variables but use vanilla/STR-owned behavior events may need variable rules only, with no `event` directive at all.
 
