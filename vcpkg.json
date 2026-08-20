@@ -1,6 +1,6 @@
 {
   "name": "animsynctogether",
-  "version-string": "0.11.4",
+  "version-string": "0.12.0",
   "dependencies": [
     "commonlibsse-ng-flatrim"
   ]
