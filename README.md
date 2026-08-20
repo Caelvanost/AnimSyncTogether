@@ -4,13 +4,13 @@ AnimSync Together is an experimental SKSE/CommonLibSSE-NG plugin for Skyrim Spec
 
 ## Status
 
-**v0.12.0 — data-driven custom animation synchronization foundation**
+**v0.12.1 — data-driven custom animation synchronization foundation + MSVC compile fix**
 
 v0.11.x validated the core approach with Helmet Toggle 2: custom animation replacement is often controlled by animation graph state that Skyrim Together Reborn does not reproduce on its remote proxies. Synchronizing the required graph variables before replaying a custom graph input allows Open Animation Replacer to select the same replacement on the remote client.
 
-The Helmet Toggle path remains validated and retained in v0.12.0, including the stale `AnimObjectHelmetInvisible` scene-graph cleanup introduced in v0.11.4.
+The Helmet Toggle path remains validated and retained in v0.12.x, including the stale `AnimObjectHelmetInvisible` scene-graph cleanup introduced in v0.11.4.
 
-v0.12.0 generalizes the transport so compatibility with additional animation mods no longer has to be hardcoded into the DLL.
+v0.12.0 generalized the transport so compatibility with additional animation mods no longer has to be hardcoded into the DLL. v0.12.1 fixes an MSVC `most vexing parse` error in OAR config discovery by using brace initialization for the `std::istreambuf_iterator` range used to read `config.json` files.
 
 ### Generic synchronization model
 
@@ -69,7 +69,7 @@ This means a new animation mod can be supported by adding a profile rather than 
 
 ### Helmet Toggle 2 profile
 
-v0.12.0 packages:
+v0.12.x packages:
 
 ```text
 SKSE/Plugins/AnimSyncTogether/Rules/HelmetToggle2.rules
@@ -90,7 +90,7 @@ If external rule files are missing entirely, AnimSync falls back to the same bui
 
 ## OAR variable discovery diagnostics
 
-At startup, v0.12.0 scans deployed OAR `config.json` files under the common OAR animation roots and extracts referenced `graphVariable` names for diagnostics only.
+At startup, v0.12.x scans deployed OAR `config.json` files under the common OAR animation roots and extracts referenced `graphVariable` names for diagnostics only.
 
 Discovered variables are **not synchronized automatically**. This prevents AnimSync from accidentally taking ownership of vanilla locomotion/combat graph state that STR already manages.
 
@@ -109,6 +109,8 @@ The source path makes it possible to identify variables belonging to a specific 
 - v0.11.1 removed the temporary `HT_NPCSpellMonitor` injection and reset stale GPMA graph state on proxy stop outputs.
 - v0.11.2 fixed CommonLib constness in that reset path.
 - v0.11.4 fixed the residual helmet-in-hand display by removing stale `AnimObjectHelmetInvisible` nodes from STR proxy scene graphs, including marker nodes recreated after `OffsetGPMAStop`.
+- v0.12.0 introduced the generic rules / graph-variable transport foundation.
+- v0.12.1 fixes the MSVC stream-iterator construction used by OAR variable discovery.
 
 ## Runtime dependencies
 
@@ -132,7 +134,7 @@ Logs are written to:
 Documents/My Games/Skyrim Special Edition/SKSE/AnimSyncTogether.log
 ```
 
-Useful v0.12.0 markers:
+Useful v0.12.x markers:
 
 ```text
 SyncRules: loading profile=...
@@ -195,7 +197,7 @@ build_release.bat
 to create:
 
 ```text
-dist/AnimSyncTogether-v0.12.0.zip
+dist/AnimSyncTogether-v0.12.1.zip
 ```
 
 The archive includes the DLL and packaged rule profiles.
