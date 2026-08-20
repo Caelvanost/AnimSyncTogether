@@ -3,6 +3,7 @@
 #include "AnimSyncTogether/AnimationClipProbe.h"
 #include "AnimSyncTogether/AnimationProbe.h"
 #include "AnimSyncTogether/OARClient.h"
+#include "AnimSyncTogether/SyncRules.h"
 
 #include <algorithm>
 #include <array>
@@ -15,16 +16,27 @@ namespace AnimSyncTogether
     namespace
     {
         constexpr char kAnimationChannel[] = "caelvanost.animsynctogether.anim.v1";
-        constexpr std::uint32_t kAnimationPacketVersion = 2;
+        constexpr std::uint32_t kSyncPacketVersion = 3;
         constexpr std::uint32_t kStateHasGPMAAnimationType = 1u << 0;
         constexpr std::uint32_t kStateHasGPMAOffsetType = 1u << 1;
 
-        struct AnimationPacket
+        enum class SyncPacketKind : std::uint32_t
         {
-            std::uint32_t version{ kAnimationPacketVersion };
+            kAnimationEvent = 1,
+            kGraphVariable = 2
+        };
+
+        struct SyncPacket
+        {
+            std::uint32_t version{ kSyncPacketVersion };
+            std::uint32_t kind{ static_cast<std::uint32_t>(SyncPacketKind::kAnimationEvent) };
             std::uint32_t stateFlags{ 0 };
+            std::uint32_t graphVariableType{ 0 };
             std::int32_t gpmaAnimationType{ 0 };
             std::int32_t gpmaOffsetType{ 0 };
+            std::int32_t graphVariableInt{ 0 };
+            float graphVariableFloat{ 0.0F };
+            std::uint32_t graphVariableBool{ 0 };
             std::array<char, 64> tag{};
             std::array<char, 128> payload{};
         };
@@ -40,9 +52,13 @@ namespace AnimSyncTogether
             destination[count] = '\0';
         }
 
-        bool IsHelmetInput(std::string_view eventName)
+        STRPM::Target AllPlayersTarget()
         {
-            return eventName == "OffsetGPMA" || eventName == "OffsetGPMAStop";
+            return STRPM::Target{
+                STRPM::TargetKind::kAllPlayers,
+                0,
+                nullptr
+            };
         }
     }
 
@@ -55,6 +71,7 @@ namespace AnimSyncTogether
     bool STRPMClient::Initialize()
     {
         OARClient::GetSingleton()->Initialize();
+        SyncRules::GetSingleton()->Initialize();
 
         if (!messaging_) {
             messaging_ = STRPM::LoadFromModule();
@@ -67,20 +84,21 @@ namespace AnimSyncTogether
         if (!channelRegistered_) {
             const auto result = messaging_->registerChannel(
                 kAnimationChannel,
-                &STRPMClient::OnAnimationMessage,
+                &STRPMClient::OnSyncMessage,
                 this,
                 &animationListener_);
             if (result != STRPM::Result::kOk) {
                 SKSE::log::error(
-                    "STRPMClient: animation channel registration failed ({})",
+                    "STRPMClient: sync channel registration failed ({})",
                     STRPM::ResultToString(result));
                 return false;
             }
             channelRegistered_ = true;
             SKSE::log::info(
-                "STRPMClient: animation channel registered '{}'; GPMA state replay enabled packetVersion={}",
+                "STRPMClient: sync channel registered '{}'; packetVersion={} profiles={}",
                 kAnimationChannel,
-                kAnimationPacketVersion);
+                kSyncPacketVersion,
+                SyncRules::GetSingleton()->GetProfileCount());
         }
 
         if (!resolver_) {
@@ -134,7 +152,8 @@ namespace AnimSyncTogether
             return false;
         }
 
-        AnimationPacket packet{};
+        SyncPacket packet{};
+        packet.kind = static_cast<std::uint32_t>(SyncPacketKind::kAnimationEvent);
         if (hasGPMAAnimationType) {
             packet.stateFlags |= kStateHasGPMAAnimationType;
             packet.gpmaAnimationType = gpmaAnimationType;
@@ -146,12 +165,7 @@ namespace AnimSyncTogether
         CopyField(packet.tag, tag);
         CopyField(packet.payload, payload);
 
-        const STRPM::Target target{
-            STRPM::TargetKind::kAllPlayers,
-            0,
-            nullptr
-        };
-
+        const auto target = AllPlayersTarget();
         const auto result = messaging_->send(
             kAnimationChannel,
             target,
@@ -176,28 +190,106 @@ namespace AnimSyncTogether
         return true;
     }
 
-    void STRPM_CALL STRPMClient::OnAnimationMessage(
+    bool STRPMClient::SendGraphVariableBool(std::string_view name, bool value)
+    {
+        if (!messaging_ || !channelRegistered_) {
+            return false;
+        }
+
+        SyncPacket packet{};
+        packet.kind = static_cast<std::uint32_t>(SyncPacketKind::kGraphVariable);
+        packet.graphVariableType = static_cast<std::uint32_t>(GraphVariableType::kBool);
+        packet.graphVariableBool = value ? 1u : 0u;
+        CopyField(packet.tag, name);
+
+        const auto target = AllPlayersTarget();
+        return messaging_->send(
+                   kAnimationChannel,
+                   target,
+                   &packet,
+                   sizeof(packet),
+                   STRPM::kMessageReliable | STRPM::kMessageOrdered) == STRPM::Result::kOk;
+    }
+
+    bool STRPMClient::SendGraphVariableInt(std::string_view name, std::int32_t value)
+    {
+        if (!messaging_ || !channelRegistered_) {
+            return false;
+        }
+
+        SyncPacket packet{};
+        packet.kind = static_cast<std::uint32_t>(SyncPacketKind::kGraphVariable);
+        packet.graphVariableType = static_cast<std::uint32_t>(GraphVariableType::kInt);
+        packet.graphVariableInt = value;
+        CopyField(packet.tag, name);
+
+        const auto target = AllPlayersTarget();
+        return messaging_->send(
+                   kAnimationChannel,
+                   target,
+                   &packet,
+                   sizeof(packet),
+                   STRPM::kMessageReliable | STRPM::kMessageOrdered) == STRPM::Result::kOk;
+    }
+
+    bool STRPMClient::SendGraphVariableFloat(std::string_view name, float value)
+    {
+        if (!messaging_ || !channelRegistered_) {
+            return false;
+        }
+
+        SyncPacket packet{};
+        packet.kind = static_cast<std::uint32_t>(SyncPacketKind::kGraphVariable);
+        packet.graphVariableType = static_cast<std::uint32_t>(GraphVariableType::kFloat);
+        packet.graphVariableFloat = value;
+        CopyField(packet.tag, name);
+
+        const auto target = AllPlayersTarget();
+        return messaging_->send(
+                   kAnimationChannel,
+                   target,
+                   &packet,
+                   sizeof(packet),
+                   STRPM::kMessageReliable | STRPM::kMessageOrdered) == STRPM::Result::kOk;
+    }
+
+    void STRPM_CALL STRPMClient::OnSyncMessage(
         const STRPM::Message* message,
         void* userData)
     {
-        if (!message || !userData || !message->data || message->size != sizeof(AnimationPacket)) {
+        if (!message || !userData || !message->data || message->size != sizeof(SyncPacket)) {
             return;
         }
 
-        const auto* packet = static_cast<const AnimationPacket*>(message->data);
-        if (packet->version != kAnimationPacketVersion) {
+        const auto* packet = static_cast<const SyncPacket*>(message->data);
+        if (packet->version != kSyncPacketVersion) {
             return;
         }
 
         const std::string tag(packet->tag.data(), strnlen_s(packet->tag.data(), packet->tag.size()));
-        const std::string payload(packet->payload.data(), strnlen_s(packet->payload.data(), packet->payload.size()));
-        static_cast<STRPMClient*>(userData)->QueueAnimationMessage(
-            message->sender.connectionID,
-            tag,
-            payload,
-            packet->stateFlags,
-            packet->gpmaAnimationType,
-            packet->gpmaOffsetType);
+        const auto kind = static_cast<SyncPacketKind>(packet->kind);
+        auto* self = static_cast<STRPMClient*>(userData);
+
+        if (kind == SyncPacketKind::kAnimationEvent) {
+            const std::string payload(
+                packet->payload.data(),
+                strnlen_s(packet->payload.data(), packet->payload.size()));
+            self->QueueAnimationMessage(
+                message->sender.connectionID,
+                tag,
+                payload,
+                packet->stateFlags,
+                packet->gpmaAnimationType,
+                packet->gpmaOffsetType);
+        } else if (kind == SyncPacketKind::kGraphVariable) {
+            self->QueueGraphVariableMessage(
+                message->sender.connectionID,
+                tag,
+                packet->graphVariableType,
+                packet->graphVariableBool != 0,
+                packet->graphVariableInt,
+                packet->graphVariableFloat);
+        }
     }
 
     void STRPMClient::QueueAnimationMessage(
@@ -229,6 +321,38 @@ namespace AnimSyncTogether
                 stateFlags,
                 gpmaAnimationType,
                 gpmaOffsetType);
+        });
+    }
+
+    void STRPMClient::QueueGraphVariableMessage(
+        STRPM::ConnectionID senderConnectionID,
+        std::string name,
+        std::uint32_t variableType,
+        bool boolValue,
+        std::int32_t intValue,
+        float floatValue)
+    {
+        auto* tasks = SKSE::GetTaskInterface();
+        if (!tasks) {
+            SKSE::log::error("STRPMClient: SKSE task interface unavailable; dropping graph variable message");
+            return;
+        }
+
+        tasks->AddTask([
+            this,
+            senderConnectionID,
+            name = std::move(name),
+            variableType,
+            boolValue,
+            intValue,
+            floatValue]() {
+            ApplyGraphVariableMessage(
+                senderConnectionID,
+                name,
+                variableType,
+                boolValue,
+                intValue,
+                floatValue);
         });
     }
 
@@ -267,9 +391,9 @@ namespace AnimSyncTogether
             return;
         }
 
-        if (!IsHelmetInput(tag)) {
+        if (!SyncRules::GetSingleton()->ShouldSyncEvent(tag)) {
             SKSE::log::info(
-                "AnimRxInput sender={} proxy={:08X} actor='{}' event='{}' replay=false reason='not allow-listed'",
+                "AnimRxInput sender={} proxy={:08X} actor='{}' event='{}' replay=false reason='not in sync rules'",
                 senderConnectionID,
                 formID,
                 actor->GetName(),
@@ -301,10 +425,13 @@ namespace AnimSyncTogether
                 gpmaOffsetType,
                 offsetTypeApplied);
 
-            // The graph variables must exist before OAR evaluates the GPMA clip.
-            OARClient::GetSingleton()->ClearConditionStateData(actor);
             AnimationClipProbe::ArmActor(formID, "remote OffsetGPMA with GPMA state");
         }
+
+        // Graph-variable packets are delivered on the same reliable ordered
+        // channel before the matching custom event. Refresh OAR immediately before
+        // replay so its replacement conditions see the synchronized proxy state.
+        OARClient::GetSingleton()->ClearConditionStateData(actor);
 
         const RE::BSFixedString inputEvent{ tag.c_str() };
         const bool replayed = actor->NotifyAnimationGraph(inputEvent);
@@ -321,13 +448,100 @@ namespace AnimSyncTogether
             gpmaOffsetType);
 
         if (tag == "OffsetGPMAStop") {
-            // Helmet Toggle sends OffsetGPMAStop first and resets the animation
-            // type afterwards. Mirror that ordering when the stop is transported.
             const bool reset = actor->SetGraphVariableInt(animationTypeVariable, 0);
             SKSE::log::info(
                 "GPMAStateReset actor={:08X} variable='iGPMAAnimationType' value=0 result={} source='network stop'",
                 formID,
                 reset);
+        }
+    }
+
+    void STRPMClient::ApplyGraphVariableMessage(
+        STRPM::ConnectionID senderConnectionID,
+        const std::string& name,
+        std::uint32_t variableType,
+        bool boolValue,
+        std::int32_t intValue,
+        float floatValue)
+    {
+        if (!resolver_) {
+            return;
+        }
+
+        const auto type = static_cast<GraphVariableType>(variableType);
+        if (!SyncRules::GetSingleton()->ShouldSyncGraphVariable(name, type)) {
+            SKSE::log::warn(
+                "GraphVarRx rejected sender={} name='{}' type={} reason='not in sync rules'",
+                senderConnectionID,
+                name,
+                variableType);
+            return;
+        }
+
+        STRPM::ProxyFormID formID{};
+        const auto result = resolver_->resolve(senderConnectionID, &formID);
+        if (result != STRPM::Result::kOk || formID == STRPM::kInvalidProxyFormID) {
+            SKSE::log::info(
+                "GraphVarRx unresolved sender={} name='{}' result={}",
+                senderConnectionID,
+                name,
+                STRPM::ResultToString(result));
+            return;
+        }
+
+        auto* actor = RE::TESForm::LookupByID<RE::Actor>(formID);
+        if (!actor) {
+            SKSE::log::info(
+                "GraphVarRx sender={} proxy={:08X} actor='<missing>' name='{}' applied=false",
+                senderConnectionID,
+                formID,
+                name);
+            return;
+        }
+
+        const RE::BSFixedString variableName{ name.c_str() };
+        bool applied = false;
+
+        switch (type) {
+        case GraphVariableType::kBool:
+            applied = actor->SetGraphVariableBool(variableName, boolValue);
+            SKSE::log::info(
+                "GraphVarRx sender={} proxy={:08X} actor='{}' name='{}' type=bool value={} applied={}",
+                senderConnectionID,
+                formID,
+                actor->GetName(),
+                name,
+                boolValue,
+                applied);
+            break;
+
+        case GraphVariableType::kInt:
+            applied = actor->SetGraphVariableInt(variableName, intValue);
+            SKSE::log::info(
+                "GraphVarRx sender={} proxy={:08X} actor='{}' name='{}' type=int value={} applied={}",
+                senderConnectionID,
+                formID,
+                actor->GetName(),
+                name,
+                intValue,
+                applied);
+            break;
+
+        case GraphVariableType::kFloat:
+            applied = actor->SetGraphVariableFloat(variableName, floatValue);
+            SKSE::log::info(
+                "GraphVarRx sender={} proxy={:08X} actor='{}' name='{}' type=float value={:.6f} applied={}",
+                senderConnectionID,
+                formID,
+                actor->GetName(),
+                name,
+                floatValue,
+                applied);
+            break;
+        }
+
+        if (applied) {
+            OARClient::GetSingleton()->ClearConditionStateData(actor);
         }
     }
 
