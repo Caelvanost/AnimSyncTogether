@@ -1,5 +1,6 @@
 #include "AnimSyncTogether/AnimationInputProbe.h"
 
+#include "AnimSyncTogether/AnimationClipProbe.h"
 #include "AnimSyncTogether/STRPMClient.h"
 
 namespace AnimSyncTogether
@@ -29,8 +30,21 @@ namespace AnimSyncTogether
         RE::IAnimationGraphManagerHolder* holder,
         const RE::BSFixedString& eventName)
     {
-        const auto result = originalPlayerNotify_(holder, eventName);
         const std::string_view name = eventName.c_str();
+
+        if (name == "OffsetGPMA") {
+            AnimationClipProbe::ArmActor(0x14, "local OffsetGPMA");
+
+            std::int32_t offsetType = 0;
+            const RE::BSFixedString offsetTypeVariable{ "iGPMAOffsetType" };
+            const bool hasOffsetType = holder && holder->GetGraphVariableInt(offsetTypeVariable, offsetType);
+            SKSE::log::info(
+                "GPMAState actor=00000014 localPlayer=true variable='iGPMAOffsetType' present={} value={}",
+                hasOffsetType,
+                offsetType);
+        }
+
+        const auto result = originalPlayerNotify_(holder, eventName);
 
         SKSE::log::info(
             "AnimInput actor=00000014 localPlayer=true event='{}' result={}",
