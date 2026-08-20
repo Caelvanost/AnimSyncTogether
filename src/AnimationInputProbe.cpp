@@ -1,7 +1,9 @@
 #include "AnimSyncTogether/AnimationInputProbe.h"
 
 #include "AnimSyncTogether/AnimationClipProbe.h"
+#include "AnimSyncTogether/GraphVariableSync.h"
 #include "AnimSyncTogether/STRPMClient.h"
+#include "AnimSyncTogether/SyncRules.h"
 
 namespace AnimSyncTogether
 {
@@ -31,12 +33,21 @@ namespace AnimSyncTogether
         const RE::BSFixedString& eventName)
     {
         const std::string_view name = eventName.c_str();
+        auto* rules = SyncRules::GetSingleton();
+
+        // Capture all explicitly profiled graph variables before every local graph
+        // input. Changed values are sent on the same reliable ordered STRPM channel
+        // as custom events, so a remote proxy receives state before a replayed event.
+        GraphVariableSync::GetSingleton()->CaptureAndSend(holder);
 
         std::int32_t animationType = 0;
         std::int32_t offsetType = 0;
         bool hasAnimationType = false;
         bool hasOffsetType = false;
 
+        // Keep the already-validated Helmet Toggle state embedded in its event
+        // packets during the generic-engine transition. This remains a redundant
+        // safety path while the new graph-variable transport is being validated.
         if (IsHelmetInput(name)) {
             const RE::BSFixedString animationTypeVariable{ "iGPMAAnimationType" };
             const RE::BSFixedString offsetTypeVariable{ "iGPMAOffsetType" };
@@ -57,23 +68,25 @@ namespace AnimSyncTogether
         }
 
         const auto result = originalPlayerNotify_(holder, eventName);
+        const bool tracked = rules->ShouldSyncEvent(name);
 
         SKSE::log::info(
-            "AnimInput actor=00000014 localPlayer=true event='{}' result={}",
+            "AnimInput actor=00000014 localPlayer=true event='{}' result={} tracked={}",
             name,
-            result);
+            result,
+            tracked);
 
-        // Helmet Toggle writes iGPMAAnimationType/iGPMAOffsetType before
-        // OffsetGPMA, then sends OffsetGPMAStop before resetting animation type.
-        // Capture the state before the graph call and only transmit accepted inputs.
-        if (result && IsHelmetInput(name)) {
+        // Only explicitly profiled events are replayed. Native locomotion, combat
+        // and furniture events therefore remain owned by STR unless a compatibility
+        // profile intentionally opts a specific event into AnimSync.
+        if (result && tracked) {
             STRPMClient::GetSingleton()->SendAnimationEvent(
                 name,
                 {},
                 animationType,
-                hasAnimationType,
+                IsHelmetInput(name) && hasAnimationType,
                 offsetType,
-                hasOffsetType);
+                IsHelmetInput(name) && hasOffsetType);
         }
 
         return result;
