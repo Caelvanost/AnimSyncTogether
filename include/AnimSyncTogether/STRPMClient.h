@@ -8,7 +8,6 @@
 #include <optional>
 #include <string_view>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace AnimSyncTogether
 {
@@ -55,8 +54,6 @@ namespace AnimSyncTogether
             std::uint32_t stateFlags,
             std::int32_t gpmaAnimationType,
             std::int32_t gpmaOffsetType);
-        void EnsureHelmetToggleNPCSpell(RE::Actor* actor);
-        void RemoveInjectedHelmetToggleNPCSpell(RE::FormID formID);
 
         const STRPM::Interface* messaging_{ nullptr };
         const STRPM::ProxyResolverInterface* resolver_{ nullptr };
@@ -65,6 +62,5 @@ namespace AnimSyncTogether
         bool listenerRegistered_{ false };
         std::unordered_map<STRPM::ConnectionID, RE::FormID> connectionToFormID_;
         std::unordered_map<RE::FormID, STRPM::ConnectionID> formIDToConnection_;
-        std::unordered_set<RE::FormID> injectedHelmetToggleSpellActors_;
     };
 }
