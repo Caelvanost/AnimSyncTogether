@@ -1,10 +1,5 @@
 #include "AnimSyncTogether/AnimationClipProbe.h"
 
-#include <RE/H/hkaAnimationBinding.h>
-#include <RE/H/hkbCharacterData.h>
-#include <RE/H/hkbCharacterSetup.h>
-#include <RE/H/hkbCharacterStringData.h>
-
 namespace AnimSyncTogether
 {
     void AnimationClipProbe::Install()
@@ -66,7 +61,6 @@ namespace AnimSyncTogether
         }
 
         const auto selectedIndex = clipGenerator->animationBindingIndex;
-        const auto animationPath = GetAnimationPath(context.character, selectedIndex);
         const std::string_view clipName = clipGenerator->animationName.data() ?
             std::string_view(clipGenerator->animationName.data()) : std::string_view{};
 
@@ -76,7 +70,7 @@ namespace AnimSyncTogether
         }
 
         SKSE::log::info(
-            "ClipSelection actor={:08X} name='{}' localPlayer={} beforeIndex={} selectedIndex={} replaced={} clipName='{}' file='{}' duration={:.3f} reason='{}'",
+            "ClipSelection actor={:08X} name='{}' localPlayer={} beforeIndex={} selectedIndex={} replaced={} clipName='{}' duration={:.3f} reason='{}'",
             formID,
             actor->GetName(),
             actor == RE::PlayerCharacter::GetSingleton(),
@@ -84,7 +78,6 @@ namespace AnimSyncTogether
             selectedIndex,
             beforeIndex != selectedIndex,
             clipName,
-            animationPath,
             duration,
             it->second.reason);
     }
@@ -97,27 +90,5 @@ namespace AnimSyncTogether
 
         const auto* animationGraph = SKSE::stl::adjust_pointer<RE::BShkbAnimationGraph>(character, -0xC0);
         return animationGraph ? animationGraph->holder : nullptr;
-    }
-
-    std::string_view AnimationClipProbe::GetAnimationPath(
-        RE::hkbCharacter* character,
-        std::uint16_t bindingIndex)
-    {
-        if (!character || !character->setup) {
-            return {};
-        }
-
-        const auto& setup = character->setup;
-        if (!setup->data || !setup->data->stringData) {
-            return {};
-        }
-
-        const auto& animationNames = setup->data->stringData->animationNames;
-        if (bindingIndex >= animationNames.size()) {
-            return {};
-        }
-
-        const auto* path = animationNames[bindingIndex].data();
-        return path ? std::string_view(path) : std::string_view{};
     }
 }
