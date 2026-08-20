@@ -1,3 +1,4 @@
+#include "AnimSyncTogether/AnimationClipProbe.h"
 #include "AnimSyncTogether/AnimationInputProbe.h"
 #include "AnimSyncTogether/AnimationProbe.h"
 #include "AnimSyncTogether/STRPMClient.h"
@@ -28,6 +29,10 @@ namespace
     {
         logger::info("{}; initializing AnimSync runtime", reason);
 
+        // Install after SKSE plugins such as OAR have initialized. The vtable
+        // hooks intentionally chain the current implementation rather than
+        // bypassing it.
+        AnimSyncTogether::AnimationClipProbe::Install();
         AnimSyncTogether::AnimationInputProbe::Install();
 
         if (!AnimSyncTogether::STRPMClient::GetSingleton()->IsAvailable()) {
