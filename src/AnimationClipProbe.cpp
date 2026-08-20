@@ -1,5 +1,9 @@
 #include "AnimSyncTogether/AnimationClipProbe.h"
 
+#include <RE/H/hkbCharacterData.h>
+#include <RE/H/hkbCharacterSetup.h>
+#include <RE/H/hkbCharacterStringData.h>
+
 namespace AnimSyncTogether
 {
     void AnimationClipProbe::Install()
@@ -98,11 +102,16 @@ namespace AnimSyncTogether
         RE::hkbCharacter* character,
         std::uint16_t bindingIndex)
     {
-        if (!character || !character->setup || !character->setup->data || !character->setup->data->stringData) {
+        if (!character || !character->setup) {
             return {};
         }
 
-        const auto& animationNames = character->setup->data->stringData->animationNames;
+        const auto& setup = character->setup;
+        if (!setup->data || !setup->data->stringData) {
+            return {};
+        }
+
+        const auto& animationNames = setup->data->stringData->animationNames;
         if (bindingIndex >= animationNames.size()) {
             return {};
         }
