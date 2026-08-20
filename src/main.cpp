@@ -1,7 +1,9 @@
 #include "AnimSyncTogether/AnimationClipProbe.h"
 #include "AnimSyncTogether/AnimationInputProbe.h"
 #include "AnimSyncTogether/AnimationProbe.h"
+#include "AnimSyncTogether/GraphVariableSync.h"
 #include "AnimSyncTogether/STRPMClient.h"
+#include "AnimSyncTogether/SyncRules.h"
 #include "AnimSyncTogether/Version.h"
 
 #include <spdlog/sinks/basic_file_sink.h>
@@ -28,6 +30,9 @@ namespace
     void InstallRuntime(const char* reason)
     {
         logger::info("{}; initializing AnimSync runtime", reason);
+
+        AnimSyncTogether::SyncRules::GetSingleton()->Initialize();
+        AnimSyncTogether::GraphVariableSync::GetSingleton()->Reset();
 
         // Install after SKSE plugins such as OAR have initialized. The vtable
         // hooks intentionally chain the current implementation rather than
