@@ -4,23 +4,24 @@ AnimSync Together is an experimental SKSE/CommonLibSSE-NG plugin for Skyrim Spec
 
 ## Status
 
-**v0.10.0 — OAR condition-cache refresh + replacement diagnostics**
+**v0.11.0 — Helmet Toggle GPMA state synchronization**
 
-The STRPM transport, proxy resolution and `OffsetGPMA` replay path are validated. v0.9.2 proved that the local PlayerCharacter and the STR proxy do not receive the same effective OAR replacement for `Animations\GPMAOffsetAnimation.hkx`:
+Inspection of Helmet Toggle 2 v3.6.1 showed that its OAR replacements are selected primarily from graph state rather than a PlayerCharacter-only condition. In particular, Helmet Toggle writes `iGPMAAnimationType` before sending `OffsetGPMA` and sends `OffsetGPMAStop` before resetting that variable to zero.
 
-- local PlayerCharacter: effective clip duration around 3.3 seconds;
-- STR proxy: effective clip duration around 9.133 seconds and an internal `OffsetGPMAStop` roughly 0.2 seconds after activation.
+AnimSync v0.11.0 therefore upgrades its animation packet to version 2 and synchronizes the graph state required by Helmet Toggle:
 
-`HT_NPCSpellMonitor` is present on the STR proxy, so v0.10.0 integrates the official Open Animation Replacer Animations API and explicitly clears OAR condition state for the proxy after AnimSync injects that spell and again immediately before a remote `OffsetGPMA` replay. This forces OAR to re-evaluate replacement conditions using the proxy's current state instead of potentially reusing condition state created before the monitor spell was added.
-
-v0.10.0 also queries OAR's `GetCurrentReplacementAnimationInfo` API for each GPMA clip activation and logs the selected replacement's mod, submod, animation path and variant. This makes it possible to compare the exact Helmet Toggle replacement chosen for the local player and remote proxy.
-
-The synchronized behavior inputs remain:
-
+- `iGPMAAnimationType`
+- `iGPMAOffsetType`
 - `OffsetGPMA`
 - `OffsetGPMAStop`
 
-Animations already reproduced natively by STR, such as sneak, jump and furniture transitions, are not retransmitted.
+On the sending PlayerCharacter, AnimSync captures both graph variables immediately before the graph input is processed. On the receiving STR proxy, AnimSync applies the transmitted variables before replaying `OffsetGPMA`, clears OAR condition state so the replacement is evaluated against the new graph state, then replays the input. For `OffsetGPMAStop`, AnimSync mirrors Helmet Toggle's ordering by replaying the stop first and resetting `iGPMAAnimationType` to zero afterwards.
+
+This should allow Helmet Toggle's OAR replacement to make the same selection on the remote STR proxy as on the local player instead of falling back to the generic GPMA animation.
+
+The OAR Animations API and clip-selection diagnostics from v0.10.0 remain enabled so the selected replacement can still be compared between local player and proxy.
+
+Animations already reproduced natively by STR, such as normal locomotion, sneak, jump and furniture transitions, are not retransmitted by this milestone.
 
 ## Runtime dependency
 
@@ -36,23 +37,23 @@ Logs are written to:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/AnimSyncTogether.log`
 
-Useful v0.10.0 markers:
+Useful v0.11.0 markers:
 
-- `OARClient: OAR Animations API v1 connected`
-- `OARConditionCache: cleared actor=...`
-- `ClipProbeArm actor=... reason='local OffsetGPMA'`
-- `ClipProbeArm actor=... reason='remote OffsetGPMA'`
-- `ClipSelection ... duration=... oarReplacement=... oarMod='...' oarSubMod='...' oarPath='...' oarVariant='...'`
-- `GPMAState ... variable='iGPMAOffsetType' ...`
-- `AnimTxInput event='OffsetGPMA'`
-- `AnimRxInput ... event='OffsetGPMA' replay=true result=true`
+- `GPMAStateTx ... animationType=... offsetType=...`
+- `AnimTxInput ... stateFlags=... animationType=... offsetType=...`
+- `GPMAStateApply ... animationTypeApplied=true ...`
+- `AnimRxInput ... event='OffsetGPMA' replay=true result=true ...`
+- `GPMAStateReset ... iGPMAAnimationType ... value=0 result=true`
+- `ClipSelection ... oarReplacement=... oarMod='...' oarSubMod='...' oarPath='...' oarVariant='...'`
 - `HelmetToggleCompat: add spell ... result=true`
+
+For a helmet unequip test, the expected local state is normally `iGPMAAnimationType=2`. The remote proxy should receive and apply the same value before `OffsetGPMA` is replayed.
 
 ## Build
 
 Run `build_release.bat` to create:
 
-`dist/AnimSyncTogether-v0.10.0.zip`
+`dist/AnimSyncTogether-v0.11.0.zip`
 
 ## License
 
