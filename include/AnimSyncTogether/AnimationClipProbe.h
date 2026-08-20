@@ -27,9 +27,6 @@ namespace AnimSyncTogether
             const RE::hkbContext& context);
 
         static RE::Actor* GetActorFromCharacter(RE::hkbCharacter* character);
-        static std::string_view GetAnimationPath(
-            RE::hkbCharacter* character,
-            std::uint16_t bindingIndex);
 
         static inline REL::Relocation<decltype(HkbClipGeneratorActivate)> originalActivate_;
         static inline std::unordered_map<RE::FormID, ArmState> armedActors_;
