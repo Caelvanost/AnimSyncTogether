@@ -6,7 +6,7 @@
 namespace AnimSyncTogether::Version
 {
     inline constexpr std::uint32_t MAJOR = 0;
-    inline constexpr std::uint32_t MINOR = 9;
-    inline constexpr std::uint32_t PATCH = 2;
-    inline constexpr std::string_view STRING = "0.9.2";
+    inline constexpr std::uint32_t MINOR = 10;
+    inline constexpr std::uint32_t PATCH = 0;
+    inline constexpr std::string_view STRING = "0.10.0";
 }
