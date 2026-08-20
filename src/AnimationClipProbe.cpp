@@ -1,5 +1,7 @@
 #include "AnimSyncTogether/AnimationClipProbe.h"
 
+#include "AnimSyncTogether/OARClient.h"
+
 namespace AnimSyncTogether
 {
     void AnimationClipProbe::Install()
@@ -7,6 +9,8 @@ namespace AnimSyncTogether
         if (installed_) {
             return;
         }
+
+        OARClient::GetSingleton()->Initialize();
 
         REL::Relocation<std::uintptr_t> clipGeneratorVTable{ RE::VTABLE_hkbClipGenerator[0] };
         originalActivate_ = clipGeneratorVTable.write_vfunc(0x4, HkbClipGeneratorActivate);
@@ -69,8 +73,11 @@ namespace AnimSyncTogether
             duration = clipGenerator->binding->animation->duration;
         }
 
+        const auto replacement = OARClient::GetSingleton()->GetCurrentReplacementAnimationInfo(clipGenerator);
+        const bool hasReplacement = !replacement.animationPath.empty() || !replacement.modName.empty() || !replacement.subModName.empty();
+
         SKSE::log::info(
-            "ClipSelection actor={:08X} name='{}' localPlayer={} beforeIndex={} selectedIndex={} replaced={} clipName='{}' duration={:.3f} reason='{}'",
+            "ClipSelection actor={:08X} name='{}' localPlayer={} beforeIndex={} selectedIndex={} indexChanged={} clipName='{}' duration={:.3f} oarReplacement={} oarMod='{}' oarSubMod='{}' oarPath='{}' oarVariant='{}' reason='{}'",
             formID,
             actor->GetName(),
             actor == RE::PlayerCharacter::GetSingleton(),
@@ -79,6 +86,11 @@ namespace AnimSyncTogether
             beforeIndex != selectedIndex,
             clipName,
             duration,
+            hasReplacement,
+            replacement.modName.c_str(),
+            replacement.subModName.c_str(),
+            replacement.animationPath.c_str(),
+            replacement.variantFilename.c_str(),
             it->second.reason);
     }
 
